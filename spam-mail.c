@@ -22,7 +22,7 @@
 #define MAX_FILES 10
 #define EMAIL "joseph_ng@ucsb.edu"
 // #define EMAIL "rich@cs.ucsb.edu"
-#define SPAM_MAIL 0  	// Set to 1 to change write to also send email
+#define SPAM_MAIL 0  	// NOTE: Set to 1 to change write to also send email
 
 
 // TEMP: Phase 1: Stores the files in memory 
@@ -204,7 +204,13 @@ static int spam_mail_write(const char *path, const char *buf, size_t size,
 
 	// NOTE: truncate syscall handles the change in file size
 	// it doesn't matter in phase 1, but keep this in mind for phase 2
-	memcpy(fake_filesystem.file_contents[file_id] + offset, buf, size);
+
+	// Replaces the entire file content instead of using offsets and size
+	free(fake_filesystem.file_contents[file_id]);
+	fake_filesystem.file_contents[file_id] = strdup(buf);
+	
+	// Crashes when using vim to view contents (don't deal with offset/size yet)
+	// memcpy(fake_filesystem.file_contents[file_id] + offset, buf, size);
 
 	if (SPAM_MAIL) {
 		// ISSUE: SECURITY ISSUE!!!
@@ -264,7 +270,7 @@ int main(int argc, char *argv[]) {
 
 	// Add a fake file inside in our fake filesystem
 	char message[10000];
-	sprintf(message, "Welcome to spam mail fs!\n\nWriting to any file in this mounted directory will send an email to %s!\nThe file name and file contents will be the email's subject and message, respectively.\n\nThis directory can only hold %d files.\n", EMAIL, MAX_FILES);
+	sprintf(message, "Welcome to spam mail fs!\n\nWriting to any file in this mounted directory will send an email to %s! Please edit and recompile if that is not your intended receipiant.\nThe file name and file contents will be the email's subject and message, respectively. (Note that it may take up to several minutes to send mail)\n\nThis directory can only hold %d files.\n", EMAIL, MAX_FILES);
 	fake_filesystem.file_names[0] = strdup("/README.txt");
 	fake_filesystem.file_contents[0] = message;
 	fake_filesystem.no_files = 1;
