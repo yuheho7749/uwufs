@@ -19,8 +19,10 @@
 #include <errno.h>
 #include <string.h>
 
-#define MAX_FILES 3 // TEST:
-#define SPAM_MAIL 0
+#define MAX_FILES 10
+#define EMAIL "joseph_ng@ucsb.edu"
+// #define EMAIL "rich@cs.ucsb.edu"
+#define SPAM_MAIL 0  	// Set to 1 to change write to also send email
 
 
 // TEMP: Phase 1: Stores the files in memory 
@@ -126,18 +128,15 @@ static int spam_mail_readdir(const char *path, void *buf,
 /**
  *	Syscall to create a new file
  *
- *	TODO:
  *	Phase 1 Requirements: We can fake it by creating the file info in memory, 
  *		but that is not good for phase 2
- *	
+ *
+ * TODO:
  *	Phase 2 Requirements: We need to create this file in storage
  */
 static int spam_mail_create(const char *path, mode_t mode, 
 							struct fuse_file_info *fi) {
 	(void) fi;
-
-	// TEST:
-	printf("create file path: %s\n", path);
 
 	// // NOTE: Storing it in our in memory fake_filesystem
 	if (fake_filesystem.no_files >= MAX_FILES) {
@@ -156,12 +155,11 @@ static int spam_mail_create(const char *path, mode_t mode,
 
 static int spam_mail_open(const char *path, struct fuse_file_info *fi) {
 	int file_id;
-	file_id = search_file(path);  // TEMP: Using fake filesystem
+	file_id = search_file(path);
 	if (file_id < 0) {
 		return -ENOENT;
 	}
 
-	// TODO:
 	// if ((fi->flags & O_ACCMODE) != O_RDONLY)
 	// 	return -EACCES;
 
@@ -173,7 +171,7 @@ static int spam_mail_read(const char *path, char *buf, size_t size,
 	(void) fi;
 
 	int file_id;
-	file_id = search_file(path);  // TEMP: Using fake filesystem
+	file_id = search_file(path);
 	if (file_id < 0) {
 		return -ENOENT;
 	}
@@ -196,14 +194,16 @@ static int spam_mail_write(const char *path, const char *buf, size_t size,
 						   off_t offset, struct fuse_file_info *fi) {
 	
 	(void) path;
-	(void) fi; // This is important if this is 
+	(void) fi;
 
 	int file_id;
-	file_id = search_file(path);  // TEMP: Using fake filesystem
+	file_id = search_file(path);
 	if (file_id < 0) {
 		return -ENOENT;
 	}
 
+	// NOTE: truncate syscall handles the change in file size
+	// it doesn't matter in phase 1, but keep this in mind for phase 2
 	memcpy(fake_filesystem.file_contents[file_id] + offset, buf, size);
 
 	if (SPAM_MAIL) {
@@ -211,8 +211,7 @@ static int spam_mail_write(const char *path, const char *buf, size_t size,
 		// Taking in raw user input as command is bad!!!
 		char command[10000];
 
-		// TODO: Change to professor's email: rich@cs.ucsb.edu
-		snprintf(command, 10000, "echo \"%s\" | mail -s \"Fuse Mail!\" joseph_ng@ucsb.edu", buf);
+		snprintf(command, 10000, "echo \"%s\" | mail -s \"%s\" %s", buf, path + 1, EMAIL);
 
 		printf("Attempting to send mail\n");
 		system(command);
@@ -264,8 +263,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Add a fake file inside in our fake filesystem
+	char message[10000];
+	sprintf(message, "Welcome to spam mail fs!\n\nWriting to any file in this mounted directory will send an email to %s!\nThe file name and file contents will be the email's subject and message, respectively.\n\nThis directory can only hold %d files.\n", EMAIL, MAX_FILES);
 	fake_filesystem.file_names[0] = strdup("/README.txt");
-	fake_filesystem.file_contents[0] = strdup("Writing to any file in this mounted directory will send spam mail!\n");
+	fake_filesystem.file_contents[0] = message;
 	fake_filesystem.no_files = 1;
 
 	ret = fuse_main(argc, argv, &spam_mail_oper, NULL);
