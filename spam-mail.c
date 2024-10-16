@@ -20,6 +20,7 @@
 #include <string.h>
 
 #define MAX_FILES 3 // TEST:
+#define SPAM_MAIL 0
 
 
 // TEMP: Phase 1: Stores the files in memory 
@@ -32,13 +33,11 @@ static struct fake_filesystem {
 // TEMP: Helper to search for files in our fake filesystem
 static int search_file(const char *path) {
 
-	printf("searching for file: %s\n", path);
 	int i;
 	char *f_name;
 	for (i = 0; i < fake_filesystem.no_files; i++) {
 		f_name = fake_filesystem.file_names[i];
 		if (strcmp(path, f_name) == 0) {
-			printf("found file: %d\n", i);
 			return i;
 		}
 	}
@@ -141,40 +140,38 @@ static int spam_mail_create(const char *path, mode_t mode,
 	printf("create file path: %s\n", path);
 
 	// // NOTE: Storing it in our in memory fake_filesystem
-	// if (fake_filesystem.no_files >= MAX_FILES) {
-	// 	return -ENOSPC;
-	// }
+	if (fake_filesystem.no_files >= MAX_FILES) {
+		return -ENOSPC;
+	}
 
 	// TEMP: Ignore the file create mode for now
-	// int file_id;
-	// file_id = fake_filesystem.no_files;
-	// fake_filesystem.file_names[file_id] = strdup(path);
-	// fake_filesystem.file_contents[file_id] = strdup("");
-	//
+	int file_id;
+	file_id = fake_filesystem.no_files;
+	fake_filesystem.file_names[file_id] = strdup(path);
+	fake_filesystem.file_contents[file_id] = strdup("");
+	fake_filesystem.no_files ++;
+
 	return 0;
 }
 
 static int spam_mail_open(const char *path, struct fuse_file_info *fi) {
-	int ret;
-
-	printf("attempting to open: %s\n", path);
 	int file_id;
 	file_id = search_file(path);  // TEMP: Using fake filesystem
 	if (file_id < 0) {
-		ret = -ENOENT;
+		return -ENOENT;
 	}
 
+	// TODO:
 	// if ((fi->flags & O_ACCMODE) != O_RDONLY)
 	// 	return -EACCES;
 
-	return ret;
+	return 0;
 }
 
 static int spam_mail_read(const char *path, char *buf, size_t size, 
 						  off_t offset, struct fuse_file_info *fi) {
 	(void) fi;
 
-	printf("attempting to read: %s\n", path);
 	int file_id;
 	file_id = search_file(path);  // TEMP: Using fake filesystem
 	if (file_id < 0) {
@@ -183,8 +180,6 @@ static int spam_mail_read(const char *path, char *buf, size_t size,
 
 	int len;
 	len = strlen(fake_filesystem.file_contents[file_id]);
-	printf("file content len: %d\n", len);
-	printf("file content: %s\n", fake_filesystem.file_contents[file_id]);
 	if (offset < len) {
 		if (offset + size > len) {
 			size = len - offset;
@@ -201,7 +196,7 @@ static int spam_mail_write(const char *path, const char *buf, size_t size,
 						   off_t offset, struct fuse_file_info *fi) {
 	
 	(void) path;
-	(void) fi;
+	(void) fi; // This is important if this is 
 
 	int file_id;
 	file_id = search_file(path);  // TEMP: Using fake filesystem
@@ -209,16 +204,20 @@ static int spam_mail_write(const char *path, const char *buf, size_t size,
 		return -ENOENT;
 	}
 
-	// ISSUE: SECURITY ISSUE!!!
-	// Taking in raw user input as command is bad!!!
-	char command[10000];
+	memcpy(fake_filesystem.file_contents[file_id] + offset, buf, size);
 
-	// TODO: Change to professor's email: rich@cs.ucsb.edu
-	snprintf(command, 10000, "echo \"%s\" | mail -s \"Fuse Mail!\" joseph_ng@ucsb.edu", buf);
+	if (SPAM_MAIL) {
+		// ISSUE: SECURITY ISSUE!!!
+		// Taking in raw user input as command is bad!!!
+		char command[10000];
 
-	printf("Attempting to send mail\n");
-	system(command);
-	printf("Sent mail\n");
+		// TODO: Change to professor's email: rich@cs.ucsb.edu
+		snprintf(command, 10000, "echo \"%s\" | mail -s \"Fuse Mail!\" joseph_ng@ucsb.edu", buf);
+
+		printf("Attempting to send mail\n");
+		system(command);
+		printf("Sent mail\n");
+	}
 
 	return size;
 }
