@@ -22,7 +22,7 @@
 #define MAX_FILES 10
 #define EMAIL "joseph_ng@ucsb.edu"
 // #define EMAIL "rich@cs.ucsb.edu"
-#define SPAM_MAIL 0  	// NOTE: Set to 1 to change write to also send email
+#define SPAM_MAIL 1  	// NOTE: Set to 1 to change write to also send email
 
 
 // TEMP: Phase 1: Stores the files in memory 
@@ -227,6 +227,12 @@ static int spam_mail_write(const char *path, const char *buf, size_t size,
 	return size;
 }
 
+static int spam_mail_utimens(const char *path, const struct timespec tv[2],
+			 struct fuse_file_info *fi) {
+	// NOTE: Here so that touch command stops complaining
+	return 0;
+}
+
 static const struct fuse_operations spam_mail_oper = {
 	.init       = spam_mail_init,
 	.getattr	= spam_mail_getattr,
@@ -235,6 +241,7 @@ static const struct fuse_operations spam_mail_oper = {
 	.open		= spam_mail_open,
 	.read		= spam_mail_read,
 	.write		= spam_mail_write,
+	.utimens 	= spam_mail_utimens,
 };
 
 int main(int argc, char *argv[]) {
@@ -270,7 +277,7 @@ int main(int argc, char *argv[]) {
 
 	// Add a fake file inside in our fake filesystem
 	char message[10000];
-	sprintf(message, "Welcome to spam mail fs!\n\nWriting to any file in this mounted directory will send an email to %s! Please edit and recompile if that is not your intended receipiant.\nThe file name and file contents will be the email's subject and message, respectively. (Note that it may take up to several minutes to send mail)\n\nThis directory can only hold %d files.\n", EMAIL, MAX_FILES);
+	sprintf(message, "Welcome to spam mail fs!\n\nWriting to any file in this mounted directory will send an email to %s! Please contact developer OR edit and recompile if that is not your intended receipiant.\nThe file name and file contents will be the email's subject and message, respectively. (Note that the write command might hang a few minutes as the 'mail' utility may take some time to send for some reason)\n\nYou can use echo, touch, vi, vim, nano, etc to edit and write to the file, although keep in mind that vi/vim has side effects when editing files. Those temporary swp files will not be deleted as there is no unlink syscall.\n\nThis directory can only hold %d files.\n", EMAIL, MAX_FILES);
 	fake_filesystem.file_names[0] = strdup("/README.txt");
 	fake_filesystem.file_contents[0] = message;
 	fake_filesystem.no_files = 1;
