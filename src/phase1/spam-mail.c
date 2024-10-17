@@ -20,10 +20,9 @@
 #include <string.h>
 
 #define MAX_FILES 10
-#define EMAIL "joseph_ng@ucsb.edu"
-// #define EMAIL "rich@cs.ucsb.edu"
 #define SPAM_MAIL 1  	// NOTE: Set to 1 to change write to also send email
 
+char *email;
 
 // TEMP: Phase 1: Stores the files in memory 
 static struct fake_filesystem {
@@ -217,7 +216,7 @@ static int spam_mail_write(const char *path, const char *buf, size_t size,
 		// Taking in raw user input as command is bad!!!
 		char command[10000];
 
-		snprintf(command, 10000, "echo \"%s\" | mail -s \"%s\" %s", buf, path + 1, EMAIL);
+		snprintf(command, 10000, "echo \"%s\" | mail -s \"%s\" %s", buf, path + 1, email);
 
 		printf("Attempting to send mail\n");
 		system(command);
@@ -250,6 +249,17 @@ int main(int argc, char *argv[]) {
 	struct fuse_cmdline_opts opts;
 	struct stat stbuf;
 
+	FILE* file = fopen("./email.txt", "r");
+	if (file == NULL) {
+		fprintf(stderr, "missing email in ./email.txt\n");
+		return 1;
+	}
+	char buffer[100];
+	if (fgets(buffer, sizeof(buffer), file) != NULL) {
+		email = strdup(buffer);
+	}
+	fclose(file);
+
 	// This allows us to run fuse in the foreground and see printf outputs
 	if (fuse_parse_cmdline(&args, &opts) != 0) {
 		return 1;
@@ -277,12 +287,14 @@ int main(int argc, char *argv[]) {
 
 	// Add a fake file inside in our fake filesystem
 	char message[10000];
-	sprintf(message, "Welcome to spam mail fs!\n\nWriting to any file in this mounted directory will send an email to %s! Please contact developer OR edit and recompile if that is not your intended receipiant.\nThe file name and file contents will be the email's subject and message, respectively. (Note that the write command might hang a few minutes as the 'mail' utility may take some time to send for some reason)\n\nYou can use echo, touch, vi, vim, nano, etc to edit and write to the file, although keep in mind that vi/vim has side effects when editing files. Those temporary swp files will not be deleted as there is no unlink syscall.\n\nThis directory can only hold %d files.\n", EMAIL, MAX_FILES);
+	sprintf(message, "Welcome to spam mail fs!\n\nWriting to any file in this mounted directory will send an email to %s! If this is not your intended target email, please remount the filesystem with the correct email (contact developer).\nThe file name and file contents will be the email's subject and message, respectively. (Note that the write command might hang a few minutes as the 'mail' utility may take some time to send for some reason)\n\nYou can use echo, touch, vi, vim, nano, etc to edit and write to the file, although keep in mind that vi/vim has side effects when editing files. Those temporary swp files will not be deleted as there is no unlink syscall.\n\nThis directory can only hold %d files.\n", email, MAX_FILES);
 	fake_filesystem.file_names[0] = strdup("/README.txt");
 	fake_filesystem.file_contents[0] = message;
 	fake_filesystem.no_files = 1;
 
+	printf("Starting fuse...\nEmail: %s\n", email);
 	ret = fuse_main(argc, argv, &spam_mail_oper, NULL);
 
+	free(email);
 	return ret;
 }
