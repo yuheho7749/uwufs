@@ -1,3 +1,9 @@
+VERSION = 0
+SUBVERSION = 1
+PATCH = 5
+EXTRAVERSION = -rc1
+
+
 CC = gcc
 CFLAGS = -Wall -g
 
