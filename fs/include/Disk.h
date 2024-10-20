@@ -14,14 +14,14 @@ public:
 
     // read len bytes from the disk starting at pos into buf
     // unsafe: no bounds checking
-    void read(std::size_t pos, std::size_t len, void* buf) noexcept {
-        static_cast<Derived*>(this)->read_impl(pos, len, buf);
+    ssize_t read(std::size_t pos, std::size_t len, void* buf) noexcept {
+        return static_cast<Derived*>(this)->read_impl(pos, len, buf);
     }
 
     // write len bytes from buf to the disk starting at pos
     // unsafe: no bounds checking
-    void write(std::size_t pos, std::size_t len, const void* buf) noexcept {
-        static_cast<Derived*>(this)->write_impl(pos, len, buf);
+    ssize_t write(std::size_t pos, std::size_t len, const void* buf) noexcept {
+        return static_cast<Derived*>(this)->write_impl(pos, len, buf);
     }
 };
 
@@ -31,12 +31,14 @@ public:
 template <std::size_t MAX_SIZE>
 class StringDisk : public Disk<StringDisk<MAX_SIZE>> {
 public:
-    void read_impl(std::size_t pos, std::size_t len, void* buf) noexcept {
+    ssize_t read_impl(std::size_t pos, std::size_t len, void* buf) noexcept {
         std::memcpy(buf, data + pos, len);
+        return len;
     }
 
-    void write_impl(std::size_t pos, std::size_t len, const void* buf) noexcept {
+    ssize_t write_impl(std::size_t pos, std::size_t len, const void* buf) noexcept {
         std::memcpy(data + pos, buf, len);
+        return len;
     }
 
 private:
@@ -56,8 +58,8 @@ public:
         close(fd);
     }
 
-    void read_impl(std::size_t pos, std::size_t len, void* buf) noexcept;
-    void write_impl(std::size_t pos, std::size_t len, const void* buf) noexcept;
+    ssize_t read_impl(std::size_t pos, std::size_t len, void* buf) noexcept;
+    ssize_t write_impl(std::size_t pos, std::size_t len, const void* buf) noexcept;
 
 private:
     int fd;

@@ -1,5 +1,6 @@
 #include "FileSystem.h"
 #include "Disk.h"
+#include "FileSystemPolicy.h"
 
 #include <cassert>
 #include <string>
@@ -11,11 +12,8 @@
 // }
 
 int main() {
-    VDB vdb;
-    std::string text = "Hello, World!";
-    vdb.write(0, text.size(), text.c_str());
-    char buf[13];
-    vdb.read(0, 13, buf);
-    std::cout << buf << std::endl;
+    StringDisk<1024 * 1024> disk;
+    Ext4Policy policy;
+    policy.mkfs(&disk, 128, 1024 * 1024 / 4096);
     return 0;
 }
