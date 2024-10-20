@@ -15,5 +15,6 @@ int main() {
     StringDisk<1024 * 1024> disk;
     Ext4Policy policy;
     policy.mkfs(&disk, 128, 1024 * 1024 / 4096);
+    std::cout << "mkfs done" << std::endl;
     return 0;
 }
