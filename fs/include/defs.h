@@ -22,6 +22,9 @@ struct ext4 {
 
     // total number of block pointers in the inode
     static constexpr std::size_t N_BLOCKS = TIND_BLOCK + 1;
+
+    // size of each inode in the filesystem (256 bytes)
+    static constexpr std::size_t INODE_SIZE = 256;
 };
 
 #endif
