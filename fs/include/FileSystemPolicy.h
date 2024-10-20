@@ -4,7 +4,9 @@
 #include "defs.h"
 
 #include <algorithm>
+#include <bits/c++config.h>
 #include <cstddef>
+#include <memory>
 
 // CRTP base class
 // https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
@@ -14,40 +16,45 @@ class FileSystemPolicy {
 public:
     // customized exceptions
     struct NotEnoughBlocksError {};
+    struct NotEnoughInodesError {};
 
     template <typename DerivedDisk>
     void mkfs(DerivedDisk* disk, std::size_t ninodes, std::size_t nblocks) {
+        // throw NotEnoughBlocksError
         static_cast<Derived*>(this)->mkfs_impl(disk, ninodes, nblocks);
     }
 
+    /* INode operations */
     template <typename DerivedDisk>
-    void alloc_inode(DerivedDisk* disk) {
-        static_cast<Derived*>(this)->alloc_inode_impl();
+    std::size_t alloc_inode(DerivedDisk* disk) {
+        // return the inode number
+        // throw NotEnoughInodesError
+        // this function only returns the inode number, the inode is not initialized
+        // there's no free_inode(): just set link_cnt to 0
+        return static_cast<Derived*>(this)->alloc_inode_impl(disk);
     }
 
+    template <typename DerivedDisk>
+    void read_inode(DerivedDisk* disk, std::size_t ino, void* inode) noexcept {
+        // unsafe: no bounds checking
+        static_cast<Derived*>(this)->read_inode_impl(disk, ino, inode);
+    }
+
+    template <typename DerivedDisk>
+    void write_inode(DerivedDisk* disk, std::size_t ino, const void* inode) noexcept {
+        // unsafe: no bounds checking
+        static_cast<Derived*>(this)->write_inode_impl(disk, ino, inode);
+    }
+
+    /* Data Block operations */
     template <typename DerivedDisk>
     void alloc_block(DerivedDisk* disk) {
         static_cast<Derived*>(this)->alloc_block_impl();
     }
 
     template <typename DerivedDisk>
-    void free_inode(DerivedDisk* disk) {
-        static_cast<Derived*>(this)->free_inode_impl();
-    }
-
-    template <typename DerivedDisk>
     void free_block(DerivedDisk* disk) {
         static_cast<Derived*>(this)->free_block_impl();
-    }
-
-    template <typename DerivedDisk>
-    void read_inode(DerivedDisk* disk) {
-        static_cast<Derived*>(this)->read_inode_impl();
-    }
-
-    template <typename DerivedDisk>
-    void write_inode(DerivedDisk* disk) {
-        static_cast<Derived*>(this)->write_inode_impl();
     }
 
     template <typename DerivedDisk>
@@ -81,7 +88,9 @@ public:
 
     struct alignas(ext4::INODE_SIZE) INode {
         std::size_t link_cnt;   // number of hard links
-        INode() : link_cnt(0) {}
+        // no need to have allocated flag: if link_cnt == 0, the inode is free
+        INode() noexcept = default;
+        INode(std::size_t link_cnt) : link_cnt(link_cnt) {}
     };
     static_assert(sizeof(INode) == ext4::INODE_SIZE, "size of INode does not match inode size");
 
@@ -96,7 +105,15 @@ public:
     // nblocks: total number of blocks
     template <typename DerivedDisk>
     void mkfs_impl(DerivedDisk* disk, std::size_t ninodes, std::size_t nblocks);
-    void alloc_inode_impl();
+
+    template<typename DerivedDisk>
+    std::size_t alloc_inode_impl(DerivedDisk* disk);
+
+    template<typename DerivedDisk>
+    void read_inode_impl(DerivedDisk* disk, std::size_t ino, void* inode) noexcept;
+
+    template<typename DerivedDisk>
+    void write_inode_impl(DerivedDisk* disk, std::size_t ino, const void* inode) noexcept;
 
 private:
     template <typename DerivedDisk>
@@ -104,7 +121,7 @@ private:
 };
 
 template <typename DerivedDisk>
-void Ext4Policy::mkfs_impl(DerivedDisk *disk, std::size_t ninodes, std::size_t nblocks) {
+void Ext4Policy::mkfs_impl(DerivedDisk* disk, std::size_t ninodes, std::size_t nblocks) {
     // the actual ninodes >= specified ninodes (ceil to block size)
     // the actual nblocks <= specified nblocks (a part of dblocks may be used for free list)
 
@@ -122,7 +139,7 @@ void Ext4Policy::mkfs_impl(DerivedDisk *disk, std::size_t ninodes, std::size_t n
 
     // create inodes in disk (directly write to disk)
     auto offset{ext4::BLOCK_SIZE};
-    INode inode;
+    INode inode(0);
     for (std::size_t i{0}; i < sb.ninodes; ++i) {
         disk->write(offset, ext4::INODE_SIZE, &inode);
         offset += ext4::INODE_SIZE;
@@ -137,7 +154,7 @@ void Ext4Policy::mkfs_impl(DerivedDisk *disk, std::size_t ninodes, std::size_t n
 }
 
 template <typename DerivedDisk>
-size_t Ext4Policy::create_free_list_block(DerivedDisk *disk, std::size_t curno, std::size_t nblocks) {
+size_t Ext4Policy::create_free_list_block(DerivedDisk* disk, std::size_t curno, std::size_t nblocks) {
     // return the next free list block number (0 if no more blocks)
     auto offset{curno * ext4::BLOCK_SIZE + sizeof(std::size_t)};
     auto nextno{curno + ext4::BLOCK_SIZE / sizeof(std::size_t)};
@@ -148,6 +165,32 @@ size_t Ext4Policy::create_free_list_block(DerivedDisk *disk, std::size_t curno, 
     nextno = (nextno < nblocks) ? nextno : 0;
     disk->write(curno * ext4::BLOCK_SIZE, sizeof(std::size_t), &nextno);
     return nextno;
+}
+
+template <typename DerivedDisk>
+std::size_t Ext4Policy::alloc_inode_impl(DerivedDisk* disk) {
+    // return the inode number
+    // throw NotEnoughInodesError
+    SuperBlock sb;
+    disk->read(0, sizeof(SuperBlock), &sb);
+    INode inode;
+    for (std::size_t i{0}; i < sb.ninodes; ++i) {
+        disk->read(ext4::BLOCK_SIZE + i * ext4::INODE_SIZE, ext4::INODE_SIZE, &inode);
+        if (inode.link_cnt == 0) {
+            return i;
+        }
+    }
+    throw NotEnoughInodesError();
+}
+
+template <typename DerivedDisk>
+void Ext4Policy::read_inode_impl(DerivedDisk* disk, std::size_t ino, void* inode) noexcept {
+    disk->read(ext4::BLOCK_SIZE + ino * ext4::INODE_SIZE, ext4::INODE_SIZE, inode);
+}
+
+template <typename DerivedDisk>
+void Ext4Policy::write_inode_impl(DerivedDisk* disk, std::size_t ino, const void* inode) noexcept {
+    disk->write(ext4::BLOCK_SIZE + ino * ext4::INODE_SIZE, ext4::INODE_SIZE, inode);
 }
 
 
