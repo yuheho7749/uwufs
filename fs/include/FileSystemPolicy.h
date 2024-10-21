@@ -40,10 +40,22 @@ public:
         static_cast<Derived*>(this)->read_inode_impl(disk, ino, inode);
     }
 
+    template <typename DerivedDisk, typename T>
+    T read_inode_field(DerivedDisk* disk, std::size_t ino, std::size_t field_offset) noexcept {
+        // unsafe: no bounds checking
+        return static_cast<Derived*>(this)-> template read_inode_field_impl<DerivedDisk, T>(disk, ino, field_offset);
+    }
+
     template <typename DerivedDisk>
     void write_inode(DerivedDisk* disk, std::size_t ino, const void* inode) noexcept {
         // unsafe: no bounds checking
         static_cast<Derived*>(this)->write_inode_impl(disk, ino, inode);
+    }
+
+    template <typename DerivedDisk, typename T>
+    void write_inode_field(DerivedDisk* disk, std::size_t ino, std::size_t field_offset, const T& field) noexcept {
+        // unsafe: no bounds checking
+        static_cast<Derived*>(this)->write_inode_field_impl(disk, ino, field_offset, field);
     }
 
     /* Data Block operations */
@@ -112,8 +124,14 @@ public:
     template<typename DerivedDisk>
     void read_inode_impl(DerivedDisk* disk, std::size_t ino, void* inode) noexcept;
 
+    template<typename DerivedDisk, typename T>
+    T read_inode_field_impl(DerivedDisk* disk, std::size_t ino, std::size_t field_offset) noexcept;
+
     template<typename DerivedDisk>
     void write_inode_impl(DerivedDisk* disk, std::size_t ino, const void* inode) noexcept;
+
+    template<typename DerivedDisk, typename T>
+    void write_inode_field_impl(DerivedDisk* disk, std::size_t ino, std::size_t field_offset, const T& field) noexcept;
 
 private:
     template <typename DerivedDisk>
@@ -171,12 +189,10 @@ template <typename DerivedDisk>
 std::size_t Ext4Policy::alloc_inode_impl(DerivedDisk* disk) {
     // return the inode number
     // throw NotEnoughInodesError
-    SuperBlock sb;
-    disk->read(0, sizeof(SuperBlock), &sb);
-    INode inode;
-    for (std::size_t i{0}; i < sb.ninodes; ++i) {
-        disk->read(ext4::BLOCK_SIZE + i * ext4::INODE_SIZE, ext4::INODE_SIZE, &inode);
-        if (inode.link_cnt == 0) {
+    std::size_t ninodes;
+    disk->read(offsetof(SuperBlock, ninodes), sizeof(std::size_t), &ninodes);
+    for (std::size_t i{0}; i < ninodes; ++i) {
+        if (read_inode_field<DerivedDisk, std::size_t>(disk, i, offsetof(INode, link_cnt)) == 0) {
             return i;
         }
     }
@@ -188,9 +204,21 @@ void Ext4Policy::read_inode_impl(DerivedDisk* disk, std::size_t ino, void* inode
     disk->read(ext4::BLOCK_SIZE + ino * ext4::INODE_SIZE, ext4::INODE_SIZE, inode);
 }
 
+template <typename DerivedDisk, typename T>
+T Ext4Policy::read_inode_field_impl(DerivedDisk* disk, std::size_t ino, std::size_t field_offset) noexcept {
+    T field;
+    disk->read(ext4::BLOCK_SIZE + ino * ext4::INODE_SIZE + field_offset, sizeof(T), &field);
+    return field;
+}
+
 template <typename DerivedDisk>
 void Ext4Policy::write_inode_impl(DerivedDisk* disk, std::size_t ino, const void* inode) noexcept {
     disk->write(ext4::BLOCK_SIZE + ino * ext4::INODE_SIZE, ext4::INODE_SIZE, inode);
+}
+
+template <typename DerivedDisk, typename T>
+void Ext4Policy::write_inode_field_impl(DerivedDisk* disk, std::size_t ino, std::size_t field_offset, const T& field) noexcept {
+    disk->write(ext4::BLOCK_SIZE + ino * ext4::INODE_SIZE + field_offset, sizeof(T), &field);
 }
 
 

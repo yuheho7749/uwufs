@@ -15,12 +15,11 @@ int main() {
     StringDisk<1024 * 1024> disk;
     Ext4Policy policy;
     policy.mkfs(&disk, 128, 1024 * 1024 / 4096);
-    Ext4Policy::INode inode(1);
     for (std::size_t i{0}; i < 128; ++i) {
         auto ino{policy.alloc_inode(&disk)};
-        policy.write_inode(&disk, ino, &inode); // set link_cnt to 1
+        policy.write_inode_field(&disk, ino, offsetof(Ext4Policy::INode, link_cnt), 1);
         std::cout << "inode " << ino << std::endl;
     }
-    policy.alloc_inode(&disk);
+    policy.alloc_inode(&disk);  // let it throw NotEnoughInodesError
     return 0;
 }
