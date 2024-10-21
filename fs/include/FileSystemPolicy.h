@@ -4,7 +4,6 @@
 #include "defs.h"
 
 #include <algorithm>
-#include <bits/c++config.h>
 #include <cstddef>
 #include <memory>
 
@@ -41,9 +40,9 @@ public:
     }
 
     template <typename DerivedDisk, typename T>
-    T read_inode_field(DerivedDisk* disk, std::size_t ino, std::size_t field_offset) noexcept {
+    void read_inode_field(DerivedDisk* disk, std::size_t ino, std::size_t field_offset, T& field) noexcept {
         // unsafe: no bounds checking
-        return static_cast<Derived*>(this)-> template read_inode_field_impl<DerivedDisk, T>(disk, ino, field_offset);
+        static_cast<Derived*>(this)->read_inode_field_impl(disk, ino, field_offset, field);
     }
 
     template <typename DerivedDisk>
@@ -60,13 +59,15 @@ public:
 
     /* Data Block operations */
     template <typename DerivedDisk>
-    void alloc_block(DerivedDisk* disk) {
-        static_cast<Derived*>(this)->alloc_block_impl();
+    std::size_t alloc_dblock(DerivedDisk* disk) {
+        // throw NotEnoughBlocksError
+        // allocate a data block
+        return static_cast<Derived*>(this)->alloc_dblock_impl(disk);
     }
 
     template <typename DerivedDisk>
-    void free_block(DerivedDisk* disk) {
-        static_cast<Derived*>(this)->free_block_impl();
+    void free_dblock(DerivedDisk* disk) {
+        static_cast<Derived*>(this)->free_dblock_impl(disk);
     }
 
     template <typename DerivedDisk>
@@ -118,20 +119,23 @@ public:
     template <typename DerivedDisk>
     void mkfs_impl(DerivedDisk* disk, std::size_t ninodes, std::size_t nblocks);
 
-    template<typename DerivedDisk>
+    template <typename DerivedDisk>
     std::size_t alloc_inode_impl(DerivedDisk* disk);
 
-    template<typename DerivedDisk>
+    template <typename DerivedDisk>
     void read_inode_impl(DerivedDisk* disk, std::size_t ino, void* inode) noexcept;
 
-    template<typename DerivedDisk, typename T>
-    T read_inode_field_impl(DerivedDisk* disk, std::size_t ino, std::size_t field_offset) noexcept;
+    template <typename DerivedDisk, typename T>
+    void read_inode_field_impl(DerivedDisk* disk, std::size_t ino, std::size_t field_offset, T& field) noexcept;
 
-    template<typename DerivedDisk>
+    template <typename DerivedDisk>
     void write_inode_impl(DerivedDisk* disk, std::size_t ino, const void* inode) noexcept;
 
-    template<typename DerivedDisk, typename T>
+    template <typename DerivedDisk, typename T>
     void write_inode_field_impl(DerivedDisk* disk, std::size_t ino, std::size_t field_offset, const T& field) noexcept;
+
+    template <typename DerivedDisk>
+    std::size_t alloc_dblock_impl(DerivedDisk* disk);
 
 private:
     template <typename DerivedDisk>
@@ -141,7 +145,7 @@ private:
 template <typename DerivedDisk>
 void Ext4Policy::mkfs_impl(DerivedDisk* disk, std::size_t ninodes, std::size_t nblocks) {
     // the actual ninodes >= specified ninodes (ceil to block size)
-    // the actual nblocks <= specified nblocks (a part of dblocks may be used for free list)
+    // nblocks = 1 (superblock) + niblocks + ndblocks
 
     // create a superblock
     // we implement Linux SysV free list
@@ -152,8 +156,6 @@ void Ext4Policy::mkfs_impl(DerivedDisk* disk, std::size_t ninodes, std::size_t n
         throw NotEnoughBlocksError();
     }
     sb.ndblocks = nblocks - sb.niblocks - 1;
-    // write to disk
-    disk->write(0, sizeof(SuperBlock), &sb);
 
     // create inodes in disk (directly write to disk)
     auto offset{ext4::BLOCK_SIZE};
@@ -169,6 +171,8 @@ void Ext4Policy::mkfs_impl(DerivedDisk* disk, std::size_t ninodes, std::size_t n
     while (curno) {
         curno = create_free_list_block(disk, curno, nblocks);
     }
+    // write superblock to disk
+    disk->write(0, sizeof(SuperBlock), &sb);
 }
 
 template <typename DerivedDisk>
@@ -191,8 +195,10 @@ std::size_t Ext4Policy::alloc_inode_impl(DerivedDisk* disk) {
     // throw NotEnoughInodesError
     std::size_t ninodes;
     disk->read(offsetof(SuperBlock, ninodes), sizeof(std::size_t), &ninodes);
+    std::size_t link_cnt;
     for (std::size_t i{0}; i < ninodes; ++i) {
-        if (read_inode_field<DerivedDisk, std::size_t>(disk, i, offsetof(INode, link_cnt)) == 0) {
+        read_inode_field(disk, i, offsetof(INode, link_cnt), link_cnt);
+        if (link_cnt == 0) {
             return i;
         }
     }
@@ -205,10 +211,8 @@ void Ext4Policy::read_inode_impl(DerivedDisk* disk, std::size_t ino, void* inode
 }
 
 template <typename DerivedDisk, typename T>
-T Ext4Policy::read_inode_field_impl(DerivedDisk* disk, std::size_t ino, std::size_t field_offset) noexcept {
-    T field;
+void Ext4Policy::read_inode_field_impl(DerivedDisk* disk, std::size_t ino, std::size_t field_offset, T& field) noexcept {
     disk->read(ext4::BLOCK_SIZE + ino * ext4::INODE_SIZE + field_offset, sizeof(T), &field);
-    return field;
 }
 
 template <typename DerivedDisk>
@@ -219,6 +223,33 @@ void Ext4Policy::write_inode_impl(DerivedDisk* disk, std::size_t ino, const void
 template <typename DerivedDisk, typename T>
 void Ext4Policy::write_inode_field_impl(DerivedDisk* disk, std::size_t ino, std::size_t field_offset, const T& field) noexcept {
     disk->write(ext4::BLOCK_SIZE + ino * ext4::INODE_SIZE + field_offset, sizeof(T), &field);
+}
+
+template <typename DerivedDisk>
+std::size_t Ext4Policy::alloc_dblock_impl(DerivedDisk* disk) {
+    // throw NotEnoughBlocksError
+    // allocate a data block
+    std::size_t headno;
+    disk->read(offsetof(SuperBlock, first_free_list_block), sizeof(std::size_t), &headno);
+    if (headno == 0) {
+        throw NotEnoughBlocksError();
+    }
+    // find the first non-zero block number (not the first block number)
+    std::size_t curno;
+    for (std::size_t i{1}; i < ext4::BLOCK_SIZE / sizeof(std::size_t); ++i) {
+        disk->read(headno * ext4::BLOCK_SIZE + i * sizeof(std::size_t), sizeof(std::size_t), &curno);
+        if (curno) {
+            size_t zero{0};
+            disk->write(headno * ext4::BLOCK_SIZE + i * sizeof(std::size_t), sizeof(std::size_t), &zero);
+            return curno;
+        }
+    }
+    // the block is empty, allocate this block
+    std::size_t nextno;
+    disk->read(headno * ext4::BLOCK_SIZE, sizeof(std::size_t), &nextno);
+    // update the head
+    disk->write(offsetof(SuperBlock, first_free_list_block), sizeof(std::size_t), &nextno);
+    return headno;
 }
 
 

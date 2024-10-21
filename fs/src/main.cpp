@@ -2,6 +2,7 @@
 #include "Disk.h"
 #include "FileSystemPolicy.h"
 
+#include <bits/c++config.h>
 #include <cassert>
 #include <string>
 #include <iostream>
@@ -20,6 +21,19 @@ int main() {
         policy.write_inode_field(&disk, ino, offsetof(Ext4Policy::INode, link_cnt), 1);
         std::cout << "inode " << ino << std::endl;
     }
-    policy.alloc_inode(&disk);  // let it throw NotEnoughInodesError
+    try {
+        policy.alloc_inode(&disk);
+    } catch (const Ext4Policy::NotEnoughInodesError& e) {
+        std::cout << "Not enough inodes" << std::endl;
+    }
+    while (true) {
+        try {
+            auto ib{policy.alloc_dblock(&disk)};
+            std::cout << "block " << ib << std::endl;
+        } catch (const Ext4Policy::NotEnoughBlocksError& e) {
+            std::cout << "Not enough blocks" << std::endl;
+            break;
+        }
+    }
     return 0;
 }
