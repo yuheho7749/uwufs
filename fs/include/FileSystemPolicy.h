@@ -4,7 +4,9 @@
 #include "defs.h"
 
 #include <algorithm>
+#include <bits/c++config.h>
 #include <cstddef>
+#include <cstring>
 #include <memory>
 
 // CRTP base class
@@ -66,8 +68,9 @@ public:
     }
 
     template <typename DerivedDisk>
-    void free_dblock(DerivedDisk* disk) {
-        static_cast<Derived*>(this)->free_dblock_impl(disk);
+    void free_dblock(DerivedDisk* disk, std::size_t dbno) noexcept {
+        // unsafe: not check if the block is already free
+        static_cast<Derived*>(this)->free_dblock_impl(disk, dbno);
     }
 
     template <typename DerivedDisk>
@@ -137,9 +140,15 @@ public:
     template <typename DerivedDisk>
     std::size_t alloc_dblock_impl(DerivedDisk* disk);
 
+    template <typename DerivedDisk>
+    void free_dblock_impl(DerivedDisk* disk, std::size_t dbno) noexcept;
+
 private:
     template <typename DerivedDisk>
     std::size_t create_free_list_block(DerivedDisk* disk, std::size_t curno, std::size_t nblocks);
+
+    template <typename DerivedDisk>
+    void init_dblock_allzeroes(DerivedDisk* disk, std::size_t dbno) noexcept;
 };
 
 template <typename DerivedDisk>
@@ -159,9 +168,8 @@ void Ext4Policy::mkfs_impl(DerivedDisk* disk, std::size_t ninodes, std::size_t n
 
     // create inodes in disk (directly write to disk)
     auto offset{ext4::BLOCK_SIZE};
-    INode inode(0);
     for (std::size_t i{0}; i < sb.ninodes; ++i) {
-        disk->write(offset, ext4::INODE_SIZE, &inode);
+        write_inode_field(disk, i, offsetof(INode, link_cnt), 0);
         offset += ext4::INODE_SIZE;
     }
 
@@ -250,6 +258,43 @@ std::size_t Ext4Policy::alloc_dblock_impl(DerivedDisk* disk) {
     // update the head
     disk->write(offsetof(SuperBlock, first_free_list_block), sizeof(std::size_t), &nextno);
     return headno;
+}
+
+template <typename DerivedDisk>
+void Ext4Policy::free_dblock_impl(DerivedDisk* disk, std::size_t dbno) noexcept {
+    // unsafe: not check if the block is already free
+    std::size_t headno;
+    disk->read(offsetof(SuperBlock, first_free_list_block), sizeof(std::size_t), &headno);
+    if (headno == 0) {
+        // the free list is empty
+        init_dblock_allzeroes(disk, dbno);  // zero out the block
+        disk->write(offsetof(SuperBlock, first_free_list_block), sizeof(std::size_t), &dbno);   // update the head
+        return;
+    }
+    // headno != 0
+    // read the first block
+    Block firstblock;
+    disk->read(headno * ext4::BLOCK_SIZE, sizeof(Block), &firstblock);
+    std::size_t* nos{reinterpret_cast<std::size_t*>(&firstblock)};
+    // find the first zero block number
+    for (std::size_t i{1}; i < ext4::BLOCK_SIZE / sizeof(std::size_t); ++i) {
+        if (nos[i] == 0) {
+            disk->write(headno * ext4::BLOCK_SIZE + i * sizeof(std::size_t), sizeof(std::size_t), &dbno);
+            return;
+        }
+    }
+    // no zero block number, the block is full
+    // set the first block number to this block number
+    disk->write(offsetof(SuperBlock, first_free_list_block), sizeof(std::size_t), &dbno);
+    init_dblock_allzeroes(disk, dbno);  // zero out the block
+    disk->write(dbno * ext4::BLOCK_SIZE, sizeof(std::size_t), &headno);  // update the next block number
+}
+
+template <typename DerivedDisk>
+void Ext4Policy::init_dblock_allzeroes(DerivedDisk* disk, std::size_t dbno) noexcept {
+    Block zeroblock;
+    memset(&zeroblock, 0, sizeof(Block));
+    disk->write(dbno * ext4::BLOCK_SIZE, sizeof(Block), &zeroblock);
 }
 
 
