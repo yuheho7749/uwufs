@@ -47,7 +47,8 @@ static int search_file(const char *path) {
 
 
 static void* spam_mail_init(struct fuse_conn_info *conn,
-							struct fuse_config *cfg) {
+							struct fuse_config *cfg)
+{
 	(void) conn;
 	cfg->direct_io = 1; 	// disables page caching in the kernel
 	return NULL;
@@ -62,7 +63,8 @@ static void* spam_mail_init(struct fuse_conn_info *conn,
  * 	in stbuf
  */
 static int spam_mail_getattr(const char *path, struct stat *stbuf, 
-							 struct fuse_file_info *fi) {
+							 struct fuse_file_info *fi)
+{
 	(void) fi;	
 
 	memset(stbuf, 0, sizeof(struct stat));
@@ -103,7 +105,8 @@ static int spam_mail_getattr(const char *path, struct stat *stbuf,
 static int spam_mail_readdir(const char *path, void *buf, 
 							 fuse_fill_dir_t filler, off_t offset, 
 							 struct fuse_file_info *fi, 
-							 enum fuse_readdir_flags flags) {
+							 enum fuse_readdir_flags flags)
+{
 	(void) offset;
 	(void) fi;
 	(void) flags;
@@ -134,7 +137,8 @@ static int spam_mail_readdir(const char *path, void *buf,
  *	Phase 2 Requirements: We need to create this file in storage
  */
 static int spam_mail_create(const char *path, mode_t mode, 
-							struct fuse_file_info *fi) {
+							struct fuse_file_info *fi)
+{
 	(void) fi;
 
 	// // NOTE: Storing it in our in memory fake_filesystem
@@ -152,7 +156,8 @@ static int spam_mail_create(const char *path, mode_t mode,
 	return 0;
 }
 
-static int spam_mail_open(const char *path, struct fuse_file_info *fi) {
+static int spam_mail_open(const char *path, struct fuse_file_info *fi)
+{
 	int file_id;
 	file_id = search_file(path);
 	if (file_id < 0) {
@@ -166,7 +171,8 @@ static int spam_mail_open(const char *path, struct fuse_file_info *fi) {
 }
 
 static int spam_mail_read(const char *path, char *buf, size_t size, 
-						  off_t offset, struct fuse_file_info *fi) {
+						  off_t offset, struct fuse_file_info *fi)
+{
 	(void) fi;
 
 	int file_id;
@@ -190,7 +196,8 @@ static int spam_mail_read(const char *path, char *buf, size_t size,
 }
 
 static int spam_mail_write(const char *path, const char *buf, size_t size, 
-						   off_t offset, struct fuse_file_info *fi) {
+						   off_t offset, struct fuse_file_info *fi)
+{
 	
 	(void) path;
 	(void) fi;
@@ -208,26 +215,29 @@ static int spam_mail_write(const char *path, const char *buf, size_t size,
 	free(fake_filesystem.file_contents[file_id]);
 	fake_filesystem.file_contents[file_id] = strdup(buf);
 	
-	// Crashes when using vim to view contents (don't deal with offset/size yet)
-	// memcpy(fake_filesystem.file_contents[file_id] + offset, buf, size);
-
 	if (SPAM_MAIL) {
 		// ISSUE: SECURITY ISSUE!!!
 		// Taking in raw user input as command is bad!!!
 		char command[10000];
 
-		snprintf(command, 10000, "echo \"%s\" | mail -s \"%s\" %s", buf, path + 1, email);
+		snprintf(command, 10000, "echo \"%s\" | mail -s \"%s\" %s", buf, 
+		  		 path + 1, email);
 
+#ifdef DEBUG
 		printf("Attempting to send mail\n");
+#endif
 		system(command);
+#ifdef DEBUG
 		printf("Sent mail\n");
+#endif
 	}
 
 	return size;
 }
 
 static int spam_mail_utimens(const char *path, const struct timespec tv[2],
-			 struct fuse_file_info *fi) {
+			 struct fuse_file_info *fi)
+{
 	// NOTE: Here so that touch command stops complaining
 	return 0;
 }
@@ -243,7 +253,8 @@ static const struct fuse_operations spam_mail_oper = {
 	.utimens 	= spam_mail_utimens,
 };
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
 	int ret;
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	struct fuse_cmdline_opts opts;
@@ -287,12 +298,27 @@ int main(int argc, char *argv[]) {
 
 	// Add a fake file inside in our fake filesystem
 	char message[10000];
-	sprintf(message, "Welcome to spam mail fs!\n\nWriting to any file in this mounted directory will send an email to %s! If this is not your intended target email, please remount the filesystem with the correct email (contact developer).\nThe file name and file contents will be the email's subject and message, respectively. (Note that the write command might hang a few minutes as the 'mail' utility may take some time to send for some reason)\n\nYou can use echo, touch, vi, vim, nano, etc to edit and write to the file, although keep in mind that vi/vim has side effects when editing files. Those temporary swp files will not be deleted as there is no unlink syscall.\n\nThis directory can only hold %d files.\n", email, MAX_FILES);
+	sprintf(message,
+		"Welcome to spam mail fs!\n\nWriting to any file in this mounted "
+		"directory will send an email to %s! If this is not your intended "
+		"target email, please remount the filesystem with the correct "
+		"email (contact developer).\nThe file name and file contents will "
+		"be the email's subject and message, respectively. (Note that the "
+		"write command might hang a few minutes as the 'mail' utility may "
+		"take some time to send for some reason)\n\nYou can use echo, "
+		"touch, vi, vim, nano, etc to edit and write to the file, although "
+		"keep in mind that vi/vim has side effects when editing files. "
+		"Those temporary swp files will not be deleted as there is no "
+		"unlink syscall.\n\nThis directory can only hold %d files.\n",
+		email, MAX_FILES);
 	fake_filesystem.file_names[0] = strdup("/README.txt");
 	fake_filesystem.file_contents[0] = message;
 	fake_filesystem.no_files = 1;
 
+#ifdef DEBUG
 	printf("Starting fuse...\nEmail: %s\n", email);
+#endif
+
 	ret = fuse_main(argc, argv, &spam_mail_oper, NULL);
 
 	free(email);
