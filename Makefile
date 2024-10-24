@@ -15,7 +15,7 @@ endif
 SRC_DIR = src
 BUILD_DIR = build
 
-all: $(BUILD_DIR) phase1
+all: $(BUILD_DIR) phase1 phase2
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -23,5 +23,10 @@ $(BUILD_DIR):
 phase1: $(SRC_DIR)/phase1/spam-mail.c
 	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
 
+phase2: mkfs.uwu
+
+mkfs.uwu: $(SRC_DIR)/uwufs/mkfs-uwu.c
+	$(CC) $(CFLAGS) $^ -lfuse3 -o mkfs.uwu
+
 clean:
-	rm -f $(BUILD_DIR)/*.o phase1
+	rm -f $(BUILD_DIR)/*.o phase1 mkfs.uwu
