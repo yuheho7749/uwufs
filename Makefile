@@ -1,11 +1,11 @@
 VERSION = 0
-SUBVERSION = 1
-PATCH = 5
-EXTRAVERSION = -rc1
+SUBVERSION = 2
+PATCH = 1
+EXTRAVERSION = -a
 
 DEBUG = 0
 
-CC = gcc
+CC = g++
 CFLAGS = -Wall
 
 ifeq ($(DEBUG), 1)
@@ -26,7 +26,7 @@ phase1: $(SRC_DIR)/phase1/spam-mail.c
 phase2: mkfs.uwu
 
 mkfs.uwu: $(SRC_DIR)/uwufs/mkfs-uwu.c
-	$(CC) $(CFLAGS) $^ -lfuse3 -o mkfs.uwu
+	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
 
 clean:
 	rm -f $(BUILD_DIR)/*.o phase1 mkfs.uwu
