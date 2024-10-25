@@ -26,7 +26,6 @@ static uwufs_blk_t init_freelist(int fd,
 	return -1;
 }
 
-
 /**
  * 	Initializes the superblock. Assumes that `init_freelist` was already 
  * 		called and initialized a freelist. The blk address of the
@@ -41,7 +40,7 @@ static void init_superblock(int fd,
 	memset(buf, 0, sizeof(buf));
 	int status = lseek(fd, 0, SEEK_SET);
 	if (status != 0) {
-		perror("mkfs.uwu: cannot lseek to beginning to init superblock\n");
+		perror("mkfs.uwu: cannot lseek to beginning to init superblock");
 		close(fd);
 		exit(1);
 	}
@@ -59,7 +58,7 @@ static void init_superblock(int fd,
 	// Write super block to device
 	ssize_t bytes_written = write(fd, buf, UWUFS_BLOCK_SIZE);
 	if (bytes_written != UWUFS_BLOCK_SIZE) {
-		perror("mkfs.uwu: error writing superblock\n");
+		perror("mkfs.uwu: error writing superblock");
 		close(fd);
 		exit(1);
 	}
@@ -105,7 +104,7 @@ int main(int argc, char *argv[])
 
 	int fd = open(argv[1], O_RDWR);
 	if (fd < 0) {
-		perror("Failed to access block device\n");
+		perror("Failed to access block device");
 		return 1;
 	}
 	
@@ -115,7 +114,7 @@ int main(int argc, char *argv[])
 	uwufs_blk_t blk_dev_size;
 	ret = ioctl(fd, BLKGETSIZE64, &blk_dev_size);
 	if (ret < 0) {
-		perror("Not a block device or cannot determine size of device\n");
+		perror("Not a block device or cannot determine size of device");
 		close(fd);
 		return 1;
 	}
@@ -128,7 +127,7 @@ int main(int argc, char *argv[])
 	ret = init_uwufs(fd, blk_dev_size, UWUFS_RESERVED_SPACE,
 				  	 UWUFS_ILIST_DEFAULT_SIZE);
 
-	// printf("Successfully formated device %s\n", argv[1]);
+	printf("Done formating device %s\n", argv[1]);
 	close(fd);
 	return ret;
 }
