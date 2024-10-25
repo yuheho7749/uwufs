@@ -243,13 +243,13 @@ static int spam_mail_utimens(const char *path, const struct timespec tv[2],
 }
 
 static const struct fuse_operations spam_mail_oper = {
-	.init       = spam_mail_init,
 	.getattr	= spam_mail_getattr,
-	.readdir	= spam_mail_readdir,
-	.create 	= spam_mail_create,
 	.open		= spam_mail_open,
 	.read		= spam_mail_read,
 	.write		= spam_mail_write,
+	.readdir	= spam_mail_readdir,
+	.init       = spam_mail_init,
+	.create 	= spam_mail_create,
 	.utimens 	= spam_mail_utimens,
 };
 
