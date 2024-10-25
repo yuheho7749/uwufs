@@ -28,8 +28,21 @@
 // Total file entry in a directory is 64 bytes
 #define UWUFS_FILE_NAME_SIZE			56
 
+/* File access flags */
+// File types
+#define F_TYPE_BITS						0b1111000000000000
+#define F_TYPE_REGULAR					1 << 12
+#define F_TYPE_DIRECTORY				2 << 12
+#define F_TYPE_SYMLINK 					3 << 12
+// File permissions (12 bits: SUID, SGID, Sticky, rwxrwxrwx)
+#define F_PERM_BITS						0b0000111111111111
+#define F_PERM_SUID						1 << 11
+#define F_PERM_SGID						1 << 10
+#define F_PERM_STICKY					1 << 9
+
+
 typedef uint64_t uwufs_blk_t; 	// 64 bits (8 bytes)
-typedef char uwufs_file_name_t[56];
+typedef char uwufs_file_name_t[UWUFS_FILE_NAME_SIZE];
 
 struct uwufs_super_blk {
 	uwufs_blk_t total_blks;
@@ -39,21 +52,27 @@ struct uwufs_super_blk {
 };
 
 struct uwufs_inode {
-	uwufs_blk_t direct_blks[10];
+	uwufs_blk_t direct_blks[UWUFS_DIRECT_BLOCKS];
 	uwufs_blk_t single_indirect_blks;
 	uwufs_blk_t double_indirect_blks;
 	uwufs_blk_t triple_indirect_blks;
-	unsigned int file_metadata; 			// file types
-	// Handle permissions etc later
+	uint16_t access_flags; 				// file types/permissions
+	// TODO: owner, num of links, etc
+};
+
+struct uwufs_inode_blk {
+	struct uwufs_inode inodes[UWUFS_BLOCK_SIZE/128];
 };
 
 struct uwufs_directory_file_entry {
 	uwufs_file_name_t file_name;
-	uwufs_blk_t inode;
+	uwufs_blk_t inode_num;
 };
 
 struct uwufs_directory_blk {
-	struct uwufs_directory_file_entry file_entries[64];
+	// 64 entries (assuming 4096 byte block size and 64 bytes per entry)
+	struct uwufs_directory_file_entry file_entries[
+		UWUFS_BLOCK_SIZE/sizeof(struct uwufs_directory_file_entry)];
 };
 
 struct uwufs_regular_file_blk {

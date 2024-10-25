@@ -23,7 +23,7 @@ $(BUILD_DIR):
 phase1: $(SRC_DIR)/phase1/spam-mail.c
 	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
 
-mkfs.uwu: $(SRC_DIR)/uwufs/mkfs-uwu.c
+mkfs.uwu: $(SRC_DIR)/uwufs/mkfs_uwu.c
 	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
 
 clean:
