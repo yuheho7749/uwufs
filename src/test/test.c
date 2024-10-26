@@ -89,6 +89,17 @@ int main(int argc, char* argv[]) {
 	printf("Freelist head\n");
 	printf("\tNext free block num: %lu\n", free_blk.next_free_blk);
 
+	// ----- Read last freelist block -----
+	struct uwufs_free_data_blk last_free_blk;
+	status = read_blk(fd, &last_free_blk, blk_dev_size/UWUFS_BLOCK_SIZE - 1);
+	if (status < 0) {
+		perror("Failed to read last freelist block");
+		close(fd);
+		exit(1);
+	}
+	printf("Last freelist block: %lu\n", blk_dev_size/UWUFS_BLOCK_SIZE - 1);
+	printf("\tNext free block num: %lu\n", last_free_blk.next_free_blk);
+
 	close(fd);
 	return ret;
 }
