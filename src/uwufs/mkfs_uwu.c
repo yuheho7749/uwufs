@@ -9,14 +9,11 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/ioctl.h>
 #include <linux/fs.h>
 
 #include "uwufs.h"
 #include "low_level_operations.h"
-
-char buf[UWUFS_BLOCK_SIZE];
 
 /**
  * 	TEMP: Creates a linked list structure for the freelist
@@ -28,54 +25,48 @@ static uwufs_blk_t init_freelist(int fd,
 								 uwufs_blk_t reserved_space,
 								 float ilist_percent)
 {
-	uwufs_blk_t freelist_start = 1 + reserved_space + 
+	uwufs_blk_t freelist_start = 1 + reserved_space +
 								 (ilist_percent * total_blks);
+	uwufs_blk_t freelist_end = total_blks;
+
+#ifdef DEBUG
+	printf("init_freelist: (start: %ld, end: %ld)\n", freelist_start, freelist_end);
+#endif
 
 	// Connect the blocks in the free lists
-	uwufs_blk_t current_blk = freelist_start;
-	uwufs_blk_t next_blk = current_blk + 1;
-	while (next_blk < total_blks) {
-		// int status = lseek(fd, current_blk, SEEK_SET);
-		// if (status < 0) {
-		// 	perror("Abort: failed lseek freelist");
-		// 	close(fd);
-		// 	exit(1);
-		// }
-		
-		// Connect to next block
-		memset(buf, 0, sizeof(buf)); // technically not needed
-		memset(buf, next_blk, sizeof(next_blk));
+	uwufs_blk_t current_blk_num = freelist_start;
+	uwufs_blk_t next_blk_num = current_blk_num + 1;
+	struct uwufs_free_data_blk free_data_blk;
+	while (next_blk_num < freelist_end) {
+#ifdef DEBUG
+		if (current_blk_num % (freelist_end/100) == 0) {
+			printf("\tinit_freelist progress: %ld/%ld\n",
+				current_blk_num, freelist_end);
+		}
+#endif
 
+		// Connect to next block
+		free_data_blk.next_free_blk = next_blk_num;
+		
 		// Write block to device
-		ssize_t bytes_written = write_blk(fd, buf, UWUFS_BLOCK_SIZE,
-										  current_blk);
+		ssize_t bytes_written = write_blk(fd, &free_data_blk, UWUFS_BLOCK_SIZE, current_blk_num);
 		if (bytes_written != UWUFS_BLOCK_SIZE) {
-			perror("Abort: failed writing freelist");
+			perror("mkfs.uwu: failed writing freelist");
 			close(fd);
 			exit(1);
 		}
 
-		// ssize_t bytes_written = write(fd, buf, UWUFS_BLOCK_SIZE);
-		// if (bytes_written != UWUFS_BLOCK_SIZE) {
-		// 	perror("Abort: failed writing freelist");
-		// 	close(fd);
-		// 	exit(1);
-		// }
-		current_blk = next_blk;
-		next_blk ++;
+		current_blk_num = next_blk_num;
+		next_blk_num ++;
 	}
 
 	// Write 0 to last blk
-	int status = lseek(fd, current_blk, SEEK_SET);
-	if (status < 0) {
-		perror("Abort: failed lseek freelist");
-		close(fd);
-		exit(1);
-	}
-	memset(buf, 0, sizeof(buf));
-	ssize_t bytes_written = write(fd, buf, UWUFS_BLOCK_SIZE);
+	free_data_blk.next_free_blk = 0;
+
+	ssize_t bytes_written = write_blk(fd, &free_data_blk, UWUFS_BLOCK_SIZE,
+								      current_blk_num);
 	if (bytes_written != UWUFS_BLOCK_SIZE) {
-		perror("Abort: failed writing freelist");
+		perror("mkfs.uwu: failed writing freelist");
 		close(fd);
 		exit(1);
 	}
@@ -94,14 +85,6 @@ static void init_superblock(int fd,
 							float ilist_percent,
 							uwufs_blk_t first_free_blk)
 {
-	memset(buf, 0, sizeof(buf));
-	int status = lseek(fd, 0, SEEK_SET);
-	if (status != 0) {
-		perror("mkfs.uwu: cannot lseek to beginning to init superblock");
-		close(fd);
-		exit(1);
-	}
-	
 	// Set super block values
 	struct uwufs_super_blk super_blk;
 	super_blk.total_blks = total_blks;
@@ -109,10 +92,8 @@ static void init_superblock(int fd,
 	super_blk.ilist_start = 1 + reserved_space; // after super + reserved
 	super_blk.ilist_size = ilist_percent * super_blk.total_blks;	
 
-	memcpy(buf, &super_blk, sizeof(super_blk));
-
 	// Write super block to device
-	ssize_t bytes_written = write(fd, buf, UWUFS_BLOCK_SIZE);
+	ssize_t bytes_written = write_blk(fd, &super_blk, UWUFS_BLOCK_SIZE, 0);
 	if (bytes_written != UWUFS_BLOCK_SIZE) {
 		perror("mkfs.uwu: error writing superblock");
 		close(fd);
@@ -120,28 +101,19 @@ static void init_superblock(int fd,
 	}
 }
 
-// TODO:
-static void init_root_directory(int fd,
-								uwufs_blk_t ilist_start)
+static void init_root_directory(int fd)
 {
-	int status = lseek(fd, ilist_start, SEEK_SET);
-	if (status < 0) {
-		perror("mkfs.uwu: cannot lseek to root inode block");
-		close(fd);
-		exit(1);
-	}
-
-	struct uwufs_inode_blk root_inode_blk;
 	struct uwufs_inode root_inode;
 	root_inode.access_flags = F_TYPE_REGULAR | 755;
 	// NOTE: Maybe need to allocate a data block as well?
 
-	root_inode_blk.inodes[2] = root_inode;
-
-	memset(buf, 0, sizeof(buf));
-	memcpy(buf, &root_inode_blk, sizeof(root_inode_blk));
-
-	// TODO: write to actual block
+	// write to actual block
+	ssize_t status = write_inode(fd, &root_inode, sizeof(struct uwufs_inode), 2);
+	if (status < 0) {
+		perror("mkfs.uwu: error init root directory");
+		close(fd);
+		exit(1);
+	}
 }
 
 /**
@@ -160,17 +132,31 @@ static int init_uwufs(int fd,
 {
 	// init i-list/i-nodes (nothing to be done)
 	
-	// init free list
+#ifdef DEBUG
+	printf("Initializing free list\n");
+#endif
 	uwufs_blk_t first_free_blk = init_freelist(fd, total_blks, 
 											reserved_space, ilist_percent);
+#ifdef DEBUG
+	printf("Initialized free list\n");
+#endif
 	
+#ifdef DEBUG
+	printf("Initializing superblock\n");
+#endif
 	init_superblock(fd, total_blks, reserved_space, ilist_percent,
 				  	first_free_blk);
 #ifdef DEBUG
 	printf("Initialized super block\n");
 #endif
-	
-	// TODO: init root directory
+
+#ifdef DEBUG
+	printf("Initializing root directory\n");
+#endif
+	init_root_directory(fd);
+#ifdef DEBUG
+	printf("Initialized root directory\n");
+#endif
 
 	return 0;
 }

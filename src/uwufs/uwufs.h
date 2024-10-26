@@ -44,39 +44,52 @@
 typedef uint64_t uwufs_blk_t; 	// 64 bits (8 bytes)
 typedef char uwufs_file_name_t[UWUFS_FILE_NAME_SIZE];
 
-struct uwufs_super_blk {
+struct __attribute__((__packed__)) uwufs_super_blk {
 	uwufs_blk_t total_blks;
 	uwufs_blk_t freelist_head;
 	uwufs_blk_t ilist_start;
 	uwufs_blk_t ilist_size;
+	// Need padding (or memcpy mindfully)
+	char padding[UWUFS_BLOCK_SIZE - (4 * sizeof(uwufs_blk_t))];
 };
 
-struct uwufs_inode {
+struct __attribute__((__packed__)) uwufs_inode {
 	uwufs_blk_t direct_blks[UWUFS_DIRECT_BLOCKS];
 	uwufs_blk_t single_indirect_blks;
 	uwufs_blk_t double_indirect_blks;
 	uwufs_blk_t triple_indirect_blks;
 	uint16_t access_flags; 				// file types/permissions
 	// TODO: owner, num of links, etc
+	
+	// Padding to get to 128 bytes
+	uint64_t padding1;
+	uint64_t padding2;
+	uint32_t padding3;
+	uint16_t padding4;
 };
 
-struct uwufs_inode_blk {
+struct __attribute__((__packed__)) uwufs_inode_blk {
 	struct uwufs_inode inodes[UWUFS_BLOCK_SIZE/128];
 };
 
-struct uwufs_directory_file_entry {
+struct __attribute__((__packed__)) uwufs_directory_file_entry {
 	uwufs_file_name_t file_name;
 	uwufs_blk_t inode_num;
 };
 
-struct uwufs_directory_blk {
+struct __attribute__((__packed__)) uwufs_directory_data_blk {
 	// 64 entries (assuming 4096 byte block size and 64 bytes per entry)
 	struct uwufs_directory_file_entry file_entries[
 		UWUFS_BLOCK_SIZE/sizeof(struct uwufs_directory_file_entry)];
 };
 
-struct uwufs_regular_file_blk {
+struct __attribute__((__packed__)) uwufs_regular_file_data_blk {
 	char data[UWUFS_BLOCK_SIZE];
+};
+
+struct __attribute__((__packed__)) uwufs_free_data_blk {
+	uwufs_blk_t next_free_blk;
+	char padding[UWUFS_BLOCK_SIZE - sizeof(uwufs_blk_t)];
 };
 
 #endif
