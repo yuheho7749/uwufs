@@ -63,12 +63,13 @@ struct __attribute__((__packed__)) uwufs_inode {
 	uwufs_blk_t triple_indirect_blks;
 	uint16_t access_flags; 				// file types/permissions
 	// TODO: owner, num of links, etc
-	
+	uint16_t link_count;
+
 	// Padding to get to 128 bytes
 	uint64_t padding1;
 	uint64_t padding2;
 	uint32_t padding3;
-	uint16_t padding4;
+	//removed extra uint16_t padding after adding link_count
 };
 
 struct __attribute__((__packed__)) uwufs_inode_blk {

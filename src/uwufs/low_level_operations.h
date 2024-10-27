@@ -58,4 +58,6 @@ ssize_t read_inode(int fd, void* buf, uwufs_blk_t inode_num);
 ssize_t write_inode(int fd, const void* buf, size_t size, uwufs_blk_t inode_num);
 
 
+uwufs_blk_t get_first_free_inode(int fd, uwufs_blk_t ilist_start, uwufs_blk_t ilist_size);
+
 #endif

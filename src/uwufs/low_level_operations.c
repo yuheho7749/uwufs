@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 
 ssize_t read_blk(int fd, void* buf, uwufs_blk_t blk_num)
 {
@@ -113,3 +114,52 @@ ssize_t write_inode(int fd,
 	}
 	return status;
 }
+
+
+// Return the first free inode
+uwufs_blk_t get_first_free_inode(int fd, 
+								uwufs_blk_t ilist_start, 
+								uwufs_blk_t ilist_size)
+{
+    // buffers for inode blk and inode
+    struct uwufs_inode_blk inode_blk;
+    struct uwufs_inode inode;
+    uwufs_blk_t current_inode_blk = ilist_start;
+    uint16_t cur_inode_link_count = -1;
+
+    // read one inode block at a time 
+    while (cur_inode_link_count != 0 &&
+        current_inode_blk < (ilist_start + ilist_size)) 
+    {
+		ssize_t status = read_blk(fd, &inode_blk, current_inode_blk);
+        if (status < 0) {
+    #ifdef DEBUG
+            perror("read_inode: cannot read inode_blk");
+    #endif
+            return status;
+        }
+
+        int inodes_per_block = (UWUFS_BLOCK_SIZE / UWUFS_INODE_DEFAULT_SIZE);
+
+        // check each inode in the inode block; link count == 0 means it is unallocated
+        for (int inode_in_blk = 0; inode_in_blk < inodes_per_block; 
+			inode_in_blk++) 
+		{
+            memcpy(&inode, &inode_blk.inodes[inode_in_blk], sizeof(struct uwufs_inode));
+            cur_inode_link_count = inode.link_count;
+
+            // found a free inode
+            if (cur_inode_link_count == 0) {
+        
+                // calculate inode number and return
+                uwufs_blk_t inode_num = (current_inode_blk - ilist_start) 
+                                        * inodes_per_block + inode_in_blk;
+                return inode_num;
+            }
+        }
+        current_inode_blk++;
+    }
+     
+    return EDQUOT; // no free inodes
+}
+

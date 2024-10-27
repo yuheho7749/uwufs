@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) {
 	}
 	printf("Super Block:\n");
 	printf("\ttotal_blks: %lu\n", super_blk.total_blks);
-	printf("\tilist blk range: [%lu, %lu)\n", super_blk.ilist_start,
+		printf("\tilist blk range: [%lu, %lu)\n", super_blk.ilist_start,
 		super_blk.ilist_start + super_blk.ilist_total_size);
 	printf("\tfreelist blk range: [%lu, %lu)\n", super_blk.freelist_start,
 		super_blk.freelist_start + super_blk.freelist_total_size);
