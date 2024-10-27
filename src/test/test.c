@@ -61,9 +61,11 @@ int main(int argc, char* argv[]) {
 	}
 	printf("Super Block:\n");
 	printf("\ttotal_blks: %lu\n", super_blk.total_blks);
+	printf("\tilist blk range: [%lu, %lu)\n", super_blk.ilist_start,
+		super_blk.ilist_start + super_blk.ilist_total_size);
+	printf("\tfreelist blk range: [%lu, %lu)\n", super_blk.freelist_start,
+		super_blk.freelist_start + super_blk.freelist_total_size);
 	printf("\tfreelist_head: %lu\n", super_blk.freelist_head);
-	printf("\tilist_start: %lu\n", super_blk.ilist_start);
-	printf("\tilist_size: %lu\n", super_blk.ilist_size);
 
 	// ----- Read root directory inode info -----
 	struct uwufs_inode root_directory_inode;
@@ -76,7 +78,7 @@ int main(int argc, char* argv[]) {
 	printf("Root Directory Inode:\n");
 	uint16_t flags = root_directory_inode.access_flags;
 	printf("\tFile type: %d\n", (flags & F_TYPE_BITS) >> 12);
-	printf("\tFile type: %d\n", flags & F_PERM_BITS);
+	printf("\tFile perm: %d\n", flags & F_PERM_BITS);
 
 	// ----- Read freelist head using super blk info -----
 	struct uwufs_free_data_blk free_blk;
@@ -91,14 +93,29 @@ int main(int argc, char* argv[]) {
 
 	// ----- Read last freelist block -----
 	struct uwufs_free_data_blk last_free_blk;
-	status = read_blk(fd, &last_free_blk, blk_dev_size/UWUFS_BLOCK_SIZE - 1);
+	status = read_blk(fd, &last_free_blk, super_blk.freelist_start +
+				   	  super_blk.freelist_total_size - 1);
 	if (status < 0) {
 		perror("Failed to read last freelist block");
 		close(fd);
 		exit(1);
 	}
-	printf("Last freelist block: %lu\n", blk_dev_size/UWUFS_BLOCK_SIZE - 1);
+	printf("Last freelist block: %lu\n", super_blk.freelist_start +
+		super_blk.freelist_total_size - 1);
 	printf("\tNext free block num: %lu\n", last_free_blk.next_free_blk);
+
+	// ----- Read random inode info -----
+	struct uwufs_inode random_inode;
+	status = read_inode(fd, &random_inode, 23197);
+	if (status < 0) {
+		perror("Failed to read random inode");
+		close(fd);
+		exit(1);
+	}
+	printf("Random Inode:\n");
+	flags = random_inode.access_flags;
+	printf("\tFile type: %d\n", (flags & F_TYPE_BITS) >> 12);
+	printf("\tFile perm: %d\n", flags & F_PERM_BITS);
 
 	close(fd);
 	return ret;

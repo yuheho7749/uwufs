@@ -1,5 +1,5 @@
 /**
- * 	Defines macros and common objects for uwufs.
+ * 	Define macros and common objects for uwufs.
  *
  *	Author: Joseph
  *	Collaborators: Kay, Kong, Jason
@@ -14,7 +14,7 @@
 #define UWUFS_BLOCK_SIZE 				4096
 
 /* uwufs defaults (can be changed) */
-#define UWUFS_ILIST_DEFAULT_SIZE 		0.1f
+#define UWUFS_ILIST_DEFAULT_PERCENTAGE 	0.1f
 #define UWUFS_INODE_DEFAULT_SIZE		128
 
 #define UWUFS_DIRECT_BLOCKS				10
@@ -22,7 +22,7 @@
 #define UWUFS_DOUBLE_INDIRECT_BLOCKS	1
 #define UWUFS_TRIPLE_INDIRECT_BLOCKS	1
 
-#define UWUFS_ROOT_DIR_BLK_NUM			2
+#define UWUFS_ROOT_DIR_INODE 			2
 #define UWUFS_RESERVED_SPACE			1 	// Maybe for journal
 
 // Total file entry in a directory is 64 bytes
@@ -31,6 +31,7 @@
 /* File access flags */
 // File types
 #define F_TYPE_BITS						0b1111000000000000
+#define F_TYPE_FREE						0
 #define F_TYPE_REGULAR					1 << 12
 #define F_TYPE_DIRECTORY				2 << 12
 #define F_TYPE_SYMLINK 					3 << 12
@@ -46,11 +47,13 @@ typedef char uwufs_file_name_t[UWUFS_FILE_NAME_SIZE];
 
 struct __attribute__((__packed__)) uwufs_super_blk {
 	uwufs_blk_t total_blks;
-	uwufs_blk_t freelist_head;
 	uwufs_blk_t ilist_start;
-	uwufs_blk_t ilist_size;
-	// Need padding (or memcpy mindfully)
-	char padding[UWUFS_BLOCK_SIZE - (4 * sizeof(uwufs_blk_t))];
+	uwufs_blk_t ilist_total_size;
+	uwufs_blk_t freelist_start;
+	uwufs_blk_t freelist_total_size;
+	uwufs_blk_t freelist_head;
+
+	char padding[UWUFS_BLOCK_SIZE - (6 * sizeof(uwufs_blk_t))];
 };
 
 struct __attribute__((__packed__)) uwufs_inode {
@@ -69,7 +72,7 @@ struct __attribute__((__packed__)) uwufs_inode {
 };
 
 struct __attribute__((__packed__)) uwufs_inode_blk {
-	struct uwufs_inode inodes[UWUFS_BLOCK_SIZE/128];
+	struct uwufs_inode inodes[UWUFS_BLOCK_SIZE/sizeof(struct uwufs_inode)];
 };
 
 struct __attribute__((__packed__)) uwufs_directory_file_entry {
@@ -89,6 +92,7 @@ struct __attribute__((__packed__)) uwufs_regular_file_data_blk {
 
 struct __attribute__((__packed__)) uwufs_free_data_blk {
 	uwufs_blk_t next_free_blk;
+
 	char padding[UWUFS_BLOCK_SIZE - sizeof(uwufs_blk_t)];
 };
 
