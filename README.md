@@ -1,5 +1,5 @@
 # Universal Working Userspace File System (UWUFS)
-A universal and (hopefully) working userspace filesystem for 64-bit unix/linux-like systems.
+A universal and (hopefully) working userspace filesystem for 64-bit linux-like systems.
 
 # Instructions
 
