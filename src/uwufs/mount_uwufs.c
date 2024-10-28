@@ -17,7 +17,7 @@
 #endif
 
 #include "uwufs.h"
-#include "uwufs_operations.h"
+#include "syscalls.h"
 
 int blk_fd;
 

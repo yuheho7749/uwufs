@@ -4,8 +4,8 @@
  * 	Author: Joseph
  */
 
-#ifndef UWUFS_OPERATIONS_H
-#define UWUFS_OPERATIONS_H
+#ifndef SYSCALLS_H
+#define SYSCALLS_H
 
 #ifndef FUSE_USE_VERSION
 #define FUSE_USE_VERSION 31

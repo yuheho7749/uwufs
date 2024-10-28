@@ -16,9 +16,9 @@ endif
 SRC_DIR = src
 BUILD_DIR = build
 
-COMMON_FILES = $(SRC_DIR)/uwufs/uwufs.h $(SRC_DIR)/uwufs/low_level_operations.h $(SRC_DIR)/uwufs/low_level_operations.c $(SRC_DIR)/uwufs/uwufs_operations.h $(SRC_DIR)/uwufs/uwufs_operations.c
+COMMON_FILES = $(SRC_DIR)/uwufs/uwufs.h $(SRC_DIR)/uwufs/low_level_operations.h $(SRC_DIR)/uwufs/low_level_operations.c $(SRC_DIR)/uwufs/syscalls.h $(SRC_DIR)/uwufs/syscalls.c $(SRC_DIR)/uwufs/file_operations.h $(SRC_DIR)/uwufs/file_operations.c
 
-all: $(BUILD_DIR) phase1 mkfs.uwu
+all: $(BUILD_DIR) phase1 mkfs.uwu mount.uwu
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
