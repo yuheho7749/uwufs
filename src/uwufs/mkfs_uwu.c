@@ -12,7 +12,10 @@
 #include <assert.h>
 #include <string.h>
 #include <sys/ioctl.h>
+
+#ifdef __linux__
 #include <linux/fs.h>
+#endif
 
 #include "uwufs.h"
 #include "low_level_operations.h"
@@ -257,9 +260,17 @@ int main(int argc, char *argv[])
 
 	// Get and check size of block device
 	uwufs_blk_t blk_dev_size;
-	ret = ioctl(fd, BLKGETSIZE64, &blk_dev_size); // Assumes linux system
+
+#ifdef __linux__
+	// BLKGETSIZE64 assumes linux system
+	ret = ioctl(fd, BLKGETSIZE64, &blk_dev_size);
+#else
+	perror("Unsupported operating system: not Linux");
+	close(fd);
+	return 1;
+#endif
 	if (ret < 0) {
-		perror("Not a block device or cannot determine size of device");
+		perror("Not a block device/partition or cannot determine its size");
 		close(fd);
 		return 1;
 	}
