@@ -23,6 +23,7 @@ int blk_fd;
 
 static const struct fuse_operations uwufs_oper = {
 	.getattr	= uwufs_getattr,
+	.mkdir		= uwufs_mkdir,
 	.open		= uwufs_open,
 	.read		= uwufs_read,
 	.write		= uwufs_write,

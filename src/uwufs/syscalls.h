@@ -24,6 +24,8 @@ void* uwufs_init(struct fuse_conn_info *conn, struct fuse_config *cfg);
 int uwufs_getattr(const char *path, struct stat *stbuf,
 				  struct fuse_file_info *fi);
 
+int uwufs_mkdir(const char *path, mode_t mode);
+
 int uwufs_open(const char *path, struct fuse_file_info *fi);
 
 int uwufs_read(const char *path, char *buf, size_t size,

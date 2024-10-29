@@ -5,6 +5,7 @@
  */
 
 
+#include "file_operations.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -19,6 +20,7 @@
 
 #include "uwufs.h"
 #include "low_level_operations.h"
+#include "file_operations.h"
 
 
 /**
@@ -184,11 +186,48 @@ static void init_inodes2(int fd,
 static void init_root_directory(int fd)
 {
 	struct uwufs_inode root_inode;
-	root_inode.access_flags = F_TYPE_REGULAR | 755;
-	// NOTE: Maybe need to allocate a data block as well for . and ..?
 
-	// write to actual block
-	ssize_t status = write_inode(fd, &root_inode, sizeof(struct uwufs_inode),
+	// TODO: Abstract this to add_directory_file_entry (which is
+	// 		different from create_directory_file_entry)
+	// 		add_directory_file_entry should do the malloc_blk if
+	// 		there is no additional space in its allocated data blks
+	
+	// Add . and .. entry
+	struct uwufs_directory_data_blk dir_blk;
+	memset(&dir_blk, 0, sizeof(struct uwufs_directory_data_blk));
+	ssize_t status1 = create_directory_file_entry(&dir_blk, ".",
+											UWUFS_ROOT_DIR_INODE);
+	ssize_t status2 = create_directory_file_entry(&dir_blk, "..",
+											UWUFS_ROOT_DIR_INODE);
+	if (status1 < 0 || status2 < 0) {
+		perror("mkfs.uwu: cannot add . and .. in init root dir");
+		close(fd);
+		exit(1);
+	}
+
+	// Allocate a data block for . and ..
+	uwufs_blk_t blk_num;
+	ssize_t status = malloc_blk(fd, &blk_num);
+	if (status < 0 || blk_num <= 0) {
+		perror("mkfs.uwu: init root directory - cannot allocate data blk");
+		close(fd);
+		exit(1);
+	}
+	// Write entries to actual data block
+	status = write_blk(fd, &dir_blk, UWUFS_BLOCK_SIZE, blk_num);
+	if (status < 0) {
+		perror("mkfs.uwu: error writing to data blk");
+		close(fd);
+		exit(1);
+	}
+
+	// TODO: add other permissions, metadata, etc
+	root_inode.access_flags = F_TYPE_DIRECTORY | 755;
+	root_inode.direct_blks[0] = blk_num;
+	root_inode.file_size = 2; // . and .. entries
+
+	// Write to root inode
+	status = write_inode(fd, &root_inode, sizeof(struct uwufs_inode),
 							  UWUFS_ROOT_DIR_INODE);
 	if (status < 0) {
 		perror("mkfs.uwu: error init root directory");

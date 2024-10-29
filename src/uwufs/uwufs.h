@@ -29,6 +29,7 @@
 #define UWUFS_FILE_NAME_SIZE			56
 
 /* File access flags */
+typedef uint16_t uwufs_aflags_t;
 // File types
 #define F_TYPE_BITS						0b1111000000000000
 #define F_TYPE_FREE						0
@@ -61,11 +62,12 @@ struct __attribute__((__packed__)) uwufs_inode {
 	uwufs_blk_t single_indirect_blks;
 	uwufs_blk_t double_indirect_blks;
 	uwufs_blk_t triple_indirect_blks;
-	uint16_t access_flags; 				// file types/permissions
+	uwufs_aflags_t access_flags; 		// file types/permissions
+	uint64_t file_size;
 	// TODO: owner, num of links, etc
 	
 	// Padding to get to 128 bytes
-	uint64_t padding1;
+	// uint64_t padding1;
 	uint64_t padding2;
 	uint32_t padding3;
 	uint16_t padding4;

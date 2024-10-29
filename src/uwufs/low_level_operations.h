@@ -57,5 +57,8 @@ ssize_t read_inode(int fd, void* buf, uwufs_blk_t inode_num);
  */
 ssize_t write_inode(int fd, const void* buf, size_t size, uwufs_blk_t inode_num);
 
+ssize_t malloc_blk(int fd, uwufs_blk_t *blk_num);
+
+ssize_t free_blk(int fd, const uwufs_blk_t blk_num);
 
 #endif

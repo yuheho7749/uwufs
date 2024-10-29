@@ -28,6 +28,19 @@ int uwufs_getattr(const char *path,
 }
 
 // TODO:
+int uwufs_mkdir(const char *path,
+				mode_t mode)
+{
+	// TEMP: don't care if it's not a dir
+	if (!(mode | S_IFDIR)) {
+		return -ENOTDIR;
+	}
+
+	// TODO:
+	return -ENOENT;
+}
+
+// TODO:
 int uwufs_open(const char *path,
 			   struct fuse_file_info *fi)
 {
