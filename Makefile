@@ -1,6 +1,6 @@
 VERSION = 0
 SUBVERSION = 2
-PATCH = 9
+PATCH = 12
 EXTRAVERSION = -a
 
 DEBUG = 0
@@ -16,7 +16,7 @@ endif
 SRC_DIR = src
 BUILD_DIR = build
 
-COMMON_FILES = $(SRC_DIR)/uwufs/uwufs.h $(SRC_DIR)/uwufs/low_level_operations.h $(SRC_DIR)/uwufs/low_level_operations.c $(SRC_DIR)/uwufs/syscalls.h $(SRC_DIR)/uwufs/syscalls.c $(SRC_DIR)/uwufs/file_operations.h $(SRC_DIR)/uwufs/file_operations.c
+COMMON_FILES = $(SRC_DIR)/uwufs/uwufs.h $(SRC_DIR)/uwufs/low_level_operations.h $(SRC_DIR)/uwufs/low_level_operations.c $(SRC_DIR)/uwufs/file_operations.h $(SRC_DIR)/uwufs/file_operations.c
 
 all: $(BUILD_DIR) phase1 mkfs.uwu mount.uwu
 
@@ -29,7 +29,7 @@ phase1: $(SRC_DIR)/phase1/spam-mail.c
 mkfs.uwu: $(COMMON_FILES) $(SRC_DIR)/uwufs/mkfs_uwu.c
 	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
 
-mount.uwu: $(COMMON_FILES) $(SRC_DIR)/uwufs/mount_uwufs.c
+mount.uwu: $(COMMON_FILES) $(SRC_DIR)/uwufs/mount_uwufs.c $(SRC_DIR)/uwufs/syscalls.h $(SRC_DIR)/uwufs/syscalls.c
 	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
 
 test: $(COMMON_FILES) $(SRC_DIR)/test/test.c
