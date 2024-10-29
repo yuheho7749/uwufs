@@ -19,7 +19,7 @@
 #include "uwufs.h"
 #include "syscalls.h"
 
-int blk_fd;
+int device_fd;
 
 static const struct fuse_operations uwufs_oper = {
 	.getattr	= uwufs_getattr,
@@ -51,8 +51,8 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	blk_fd = open(argv[1], O_RDWR);
-	if (blk_fd < 0) {
+	device_fd = open(argv[1], O_RDWR);
+	if (device_fd < 0) {
 		perror("Failed to access block device");
 		return 1;
 	}
@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
 
 #ifdef __linux__
 	// BLKGETSIZE64 assumes linux system
-	ret = ioctl(blk_fd, BLKGETSIZE64, &blk_dev_size);
+	ret = ioctl(device_fd, BLKGETSIZE64, &blk_dev_size);
 #else
 	perror("Unsupported operating system: not Linux");
 	close(fd);
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
 #endif
 	if (ret < 0) {
 		perror("Not a block device/partition or cannot determine its size");
-		close(blk_fd);
+		close(device_fd);
 		return 1;
 	}
 
@@ -83,6 +83,6 @@ int main(int argc, char *argv[]) {
 
 	argv[1] = argv[0];
 	ret = fuse_main(argc - 1, &argv[1], &uwufs_oper, NULL);
-	close(blk_fd);
+	close(device_fd);
 	return ret;
 }

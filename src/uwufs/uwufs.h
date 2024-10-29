@@ -32,15 +32,16 @@
 typedef uint16_t uwufs_aflags_t;
 // File types
 #define F_TYPE_BITS						0b1111000000000000
+// NOTE: Might change to match stat.h file types?
 #define F_TYPE_FREE						0
 #define F_TYPE_REGULAR					1 << 12
 #define F_TYPE_DIRECTORY				2 << 12
 #define F_TYPE_SYMLINK 					3 << 12
 // File permissions (12 bits: SUID, SGID, Sticky, rwxrwxrwx)
 #define F_PERM_BITS						0b0000111111111111
-#define F_PERM_SUID						1 << 11
-#define F_PERM_SGID						1 << 10
-#define F_PERM_STICKY					1 << 9
+#define F_PERM_SUID						1 << 11 	// 04000 (octal)
+#define F_PERM_SGID						1 << 10 	// 02000 (octal)
+#define F_PERM_STICKY					1 << 9 		// 01000 (octal)
 
 
 typedef uint64_t uwufs_blk_t; 	// 64 bits (8 bytes)

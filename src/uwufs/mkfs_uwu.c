@@ -222,9 +222,9 @@ static void init_root_directory(int fd)
 	}
 
 	// TODO: add other permissions, metadata, etc
-	root_inode.access_flags = F_TYPE_DIRECTORY | 755;
+	root_inode.access_flags = F_TYPE_DIRECTORY | 0755;
 	root_inode.direct_blks[0] = blk_num;
-	root_inode.file_size = 2; // . and .. entries
+	root_inode.file_size = UWUFS_BLOCK_SIZE;
 
 	// Write to root inode
 	status = write_inode(fd, &root_inode, sizeof(struct uwufs_inode),

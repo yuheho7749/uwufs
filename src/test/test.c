@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
 	uint16_t flags = root_directory_inode.access_flags;
 	uint64_t dir_size = root_directory_inode.file_size;
 	printf("\tFile type: %d\n", (flags & F_TYPE_BITS) >> 12);
-	printf("\tFile perm: %d\n", flags & F_PERM_BITS);
+	printf("\tFile perm: %o\n", flags & F_PERM_BITS);
 	printf("\tDir size (raw): %lu\n", dir_size);
 
 	// ----- Read freelist head using super blk info -----
@@ -92,7 +92,10 @@ int main(int argc, char* argv[]) {
 	}
 	printf("Root Directory Entries (first block only):\n");
 	int i;
-	for (i = 0; i < dir_size % 64; i ++) {
+	for (i = 0; i < 64; i ++) {
+		if (dir_data_blk.file_entries[i].inode_num <= 0) {
+			continue;
+		}
 		printf("\t%lu\t%s\n", dir_data_blk.file_entries[i].inode_num,
 		 	   dir_data_blk.file_entries[i].file_name);
 	}
@@ -132,7 +135,7 @@ int main(int argc, char* argv[]) {
 	printf("Random Inode:\n");
 	flags = random_inode.access_flags;
 	printf("\tFile type: %d\n", (flags & F_TYPE_BITS) >> 12);
-	printf("\tFile perm: %d\n", flags & F_PERM_BITS);
+	printf("\tFile perm: %o\n", flags & F_PERM_BITS);
 	printf("\tDir size (raw): %lu\n", random_inode.file_size);
 
 	close(fd);
