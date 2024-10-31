@@ -1,5 +1,5 @@
 /**
- * 	Implement syscall operations for uwufs
+ * 	Implement fuse syscall operations for uwufs
  *
  * 	Author: Joseph
  */
@@ -26,6 +26,7 @@ void* uwufs_init(struct fuse_conn_info *conn,
 	// 		disables page caching in the kernel at the
 	// 		cost of some performance
 	cfg->direct_io = 1;
+	cfg->use_ino = 1;
 	return NULL;
 }
 
@@ -58,10 +59,12 @@ int uwufs_getattr(const char *path,
 		case F_TYPE_DIRECTORY:
 			stbuf->st_mode = S_IFDIR | (flags & F_PERM_BITS);
 			stbuf->st_size = inode.file_size;
+			stbuf->st_ino = inode_num;
 			return 0;
 		case F_TYPE_REGULAR:
 			stbuf->st_mode = S_IFREG | (flags & F_PERM_BITS);
 			stbuf->st_size = inode.file_size;
+			stbuf->st_ino = inode_num;
 			return 0;
 		default:
 			return -EINVAL;

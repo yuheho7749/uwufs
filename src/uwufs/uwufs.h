@@ -23,7 +23,7 @@
 #define UWUFS_TRIPLE_INDIRECT_BLOCKS	1
 
 #define UWUFS_ROOT_DIR_INODE 			2
-#define UWUFS_RESERVED_SPACE			1 	// Maybe for journal
+#define UWUFS_RESERVED_SPACE			1
 
 // Total file entry in a directory is 64 bytes
 #define UWUFS_FILE_NAME_SIZE			56
@@ -46,6 +46,15 @@ typedef uint16_t uwufs_aflags_t;
 
 typedef uint64_t uwufs_blk_t; 	// 64 bits (8 bytes)
 typedef char uwufs_file_name_t[UWUFS_FILE_NAME_SIZE];
+
+// PLAN: Metadata blk will be 2nd block (useful for fsck/sanity checks)
+// 		Should handle the following without a blind memcpy because of
+// 		potentially different endianness/architecture for removable media.
+// 		Also should be separate from super blk because this info should
+// 		be written once at mkfs and never changed again.
+// 	- uwufs version
+// 	- endianness
+// 	- architecture (x86_64)
 
 struct __attribute__((__packed__)) uwufs_super_blk {
 	uwufs_blk_t total_blks;

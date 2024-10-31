@@ -10,13 +10,13 @@
 #include <errno.h>
 #include <string.h>
 
-ssize_t create_file(uwufs_blk_t *inode, uwufs_aflags_t access_flags)
+ssize_t create_file(uwufs_blk_t *inode, uwufs_aflags_t flags)
 {
 	// TODO:
 	return -1;
 }
 
-ssize_t create_directory_file_entry(struct uwufs_directory_data_blk *dir_blk,
+ssize_t put_directory_file_entry(struct uwufs_directory_data_blk *dir_blk,
 								 const char name[UWUFS_FILE_NAME_SIZE],
 								 uwufs_blk_t file_inode_num)
 {
@@ -33,5 +33,6 @@ ssize_t create_directory_file_entry(struct uwufs_directory_data_blk *dir_blk,
 		}
 	}
 
-	return -ENOSPC; // TEMP: Allows only one data blk for file entries
+	// NOTE: Only cares if the provided dir_blk has space
+	return -ENOSPC;
 }

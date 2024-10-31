@@ -195,9 +195,9 @@ static void init_root_directory(int fd)
 	// Add . and .. entry
 	struct uwufs_directory_data_blk dir_blk;
 	memset(&dir_blk, 0, sizeof(struct uwufs_directory_data_blk));
-	ssize_t status1 = create_directory_file_entry(&dir_blk, ".",
+	ssize_t status1 = put_directory_file_entry(&dir_blk, ".",
 											UWUFS_ROOT_DIR_INODE);
-	ssize_t status2 = create_directory_file_entry(&dir_blk, "..",
+	ssize_t status2 = put_directory_file_entry(&dir_blk, "..",
 											UWUFS_ROOT_DIR_INODE);
 	if (status1 < 0 || status2 < 0) {
 		perror("mkfs.uwu: cannot add . and .. in init root dir");

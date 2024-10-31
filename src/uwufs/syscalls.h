@@ -1,5 +1,5 @@
 /**
- * 	Header file for syscall operations for uwufs
+ * 	Header file for fuse syscall operations for uwufs
  *
  * 	Author: Joseph
  */

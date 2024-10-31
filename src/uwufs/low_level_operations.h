@@ -57,8 +57,44 @@ ssize_t read_inode(int fd, void* buf, uwufs_blk_t inode_num);
  */
 ssize_t write_inode(int fd, const void* buf, size_t size, uwufs_blk_t inode_num);
 
+/**
+ * 	Allocates a free block from device.
+ *
+ * 	`fd`: block device
+ * 	`blk_num`: output var will contain the blk number of allocated block
+ */
 ssize_t malloc_blk(int fd, uwufs_blk_t *blk_num);
 
+/**
+ * 	Frees and returns a already allocated block to freelist.
+ * 	Caution: this function does not check if the blk is already free
+ * 		nor if it is a data block at all.
+ *
+ * 	`fd`: block device
+ * 	`blk_num`: blk number of data block to be freed
+ */
 ssize_t free_blk(int fd, const uwufs_blk_t blk_num);
+
+/**
+ * TODO: Not implemented yet
+ * 	Finds a free inode and returns it's inode number in the `inode_num`
+ * 		output variable
+ *
+ * 	`fd`: block device
+ * 	`inode_num`: output var will contain the inode number of a free inode
+ */
+ssize_t find_free_inode(int fd, uwufs_blk_t *inode_num);
+
+/**
+ * TODO:
+ * 	Find the inode of the corresponding file. If root directory inode is
+ * 		valid, it will use it. Otherwise, it will read the super blk for
+ * 		the root directory.
+ *
+ * 	`fd`: block device
+ * 	`path`: null terminated file path
+ * 	`root_dir_inode`: can be optionally provided to save a super blk read
+ */
+ssize_t namei(int fd, const char *path, const uwufs_inode *root_dir_inode);
 
 #endif
