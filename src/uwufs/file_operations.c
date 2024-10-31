@@ -1,7 +1,7 @@
 /**
- * 	Implements file operations for uwufs.
+ * Implements file operations for uwufs.
  *
- * 	Author: Joseph
+ * Author: Joseph
  */
 
 #include "file_operations.h"

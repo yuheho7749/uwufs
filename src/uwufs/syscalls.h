@@ -1,7 +1,7 @@
 /**
- * 	Header file for fuse syscall operations for uwufs
+ * Header file for fuse syscall operations for uwufs
  *
- * 	Author: Joseph
+ * Author: Joseph
  */
 
 #ifndef SYSCALLS_H
@@ -14,9 +14,9 @@
 #include <fuse3/fuse.h>
 
 /**
- * 	Set fuse connection parameters and configurations.
+ * Set fuse connection parameters and configurations.
  *
- * 	NOTE: Effects may be limited in a virtual machine (virtual kernel,
+ * NOTE: Effects may be limited in a virtual machine (virtual kernel,
  * 		memory, and devices)
  */
 void* uwufs_init(struct fuse_conn_info *conn, struct fuse_config *cfg);

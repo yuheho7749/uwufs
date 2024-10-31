@@ -1,7 +1,7 @@
 /**
- * 	Launches the fuse daemon and mounts the block device to a directory
+ * Launches the fuse daemon and mounts the block device to a directory
  *
- * 	Author: Joseph
+ * Author: Joseph
  */
 
 #define FUSE_USE_VERSION 31

@@ -1,7 +1,7 @@
 /**
- * 	Implement fuse syscall operations for uwufs
+ * Implement fuse syscall operations for uwufs
  *
- * 	Author: Joseph
+ * Author: Joseph
  */
 
 #define FUSE_USE_VERSION 31

@@ -1,7 +1,7 @@
 /**
- *	Formats block device in the uwufs format.
+ * Formats block device in the uwufs format.
  *
- *	Author: Joseph
+ * Author: Joseph
  */
 
 
@@ -23,10 +23,10 @@
 
 
 /**
- * 	Creates a linked list structure for the freelist
+ * Creates a linked list structure for the freelist
  * 
  * TODO:
- * 	Need to use a more efficient method of storing a freelist
+ * Need to use a more efficient method of storing a freelist
  */
 static uwufs_blk_t init_freelist(int fd,
 								 uwufs_blk_t total_blks,
@@ -84,7 +84,7 @@ error_exit:
 }
 
 /**
- * 	Initializes the superblock. Assumes that `init_freelist` was already 
+ * Initializes the superblock. Assumes that `init_freelist` was already 
  * 		called and had initialized a freelist. The blk address of the
  * 		freelist head will be passed in `freelist_head`
  */
@@ -115,7 +115,7 @@ static void init_superblock(int fd,
 }
 
 /**
- * 	Set ilist blocks to all 0. This makes checking if an inode
+ * Set ilist blocks to all 0. This makes checking if an inode
  * 		is used very easy (Check the access flag if it is 0)
  */
 static void init_inodes(int fd,
@@ -146,9 +146,9 @@ static void init_inodes(int fd,
 	
 
 /**
- * 	TODO:
- * 	TEST:
- * 	Make inodes a linked list for easy allocation and deallocation of
+ * TODO:
+ * TEST:
+ * Make inodes a linked list for easy allocation and deallocation of
  * 		inodes.
  */
 static void init_inodes2(int fd,
@@ -181,7 +181,7 @@ static void init_inodes2(int fd,
 }
 
 /**
- * 	Initialize root directory at inode UWUFS_ROOT_DIR_INODE
+ * Initialize root directory at inode UWUFS_ROOT_DIR_INODE
  */
 static void init_root_directory(int fd)
 {
@@ -234,13 +234,13 @@ error_exit:
 }
 
 /**
- * 	Formats the block device to uwufs format.
+ * Formats the block device to uwufs format.
  *
- * 	`fd`: the opened block device
- * 	`total_blks`: total blocks in the opened block device
- * 	`reserved_space`: number of blocks reserved after superblock
+ * `fd`: the opened block device
+ * `total_blks`: total blocks in the opened block device
+ * `reserved_space`: number of blocks reserved after superblock
  * 		and before the start of i-list
- * 	`ilist_percent`: percentage of total_blks used for i-list
+ * `ilist_percent`: percentage of total_blks used for i-list
  */
 static int init_uwufs(int fd,
 					  uwufs_blk_t total_blks,
