@@ -43,6 +43,7 @@ static uwufs_blk_t init_freelist(int fd,
 	assert(freelist_end <= total_blks);
 
 	// Connect the blocks in the free lists
+	ssize_t bytes_written;
 	uwufs_blk_t current_blk_num = freelist_start;
 	uwufs_blk_t next_blk_num = current_blk_num + 1;
 	struct uwufs_free_data_blk free_data_blk;
@@ -58,12 +59,10 @@ static uwufs_blk_t init_freelist(int fd,
 		free_data_blk.next_free_blk = next_blk_num;
 		
 		// Write block to device
-		ssize_t bytes_written = write_blk(fd, &free_data_blk, UWUFS_BLOCK_SIZE, current_blk_num);
-		if (bytes_written != UWUFS_BLOCK_SIZE) {
-			perror("mkfs.uwu: failed writing freelist");
-			close(fd);
-			exit(1);
-		}
+		bytes_written = write_blk(fd, &free_data_blk, UWUFS_BLOCK_SIZE,
+							current_blk_num);
+		if (bytes_written != UWUFS_BLOCK_SIZE)
+			goto error_exit;
 
 		current_blk_num = next_blk_num;
 		next_blk_num ++;
@@ -72,15 +71,17 @@ static uwufs_blk_t init_freelist(int fd,
 	// Write 0 to last blk
 	free_data_blk.next_free_blk = 0;
 
-	ssize_t bytes_written = write_blk(fd, &free_data_blk, UWUFS_BLOCK_SIZE,
-								      current_blk_num);
-	if (bytes_written != UWUFS_BLOCK_SIZE) {
-		perror("mkfs.uwu: failed writing freelist");
-		close(fd);
-		exit(1);
-	}
+	bytes_written = write_blk(fd, &free_data_blk, UWUFS_BLOCK_SIZE,
+						   current_blk_num);
+	if (bytes_written != UWUFS_BLOCK_SIZE)
+		goto error_exit;
 	
 	return freelist_start;
+
+error_exit:
+	perror("mkfs.uwu: failed writing freelist");
+	close(fd);
+	exit(1);
 }
 
 /**
@@ -171,7 +172,7 @@ static void init_inodes2(int fd,
 				i, total_inodes);
 		}
 #endif
-		status = write_inode(fd, &free_inode, sizeof(struct uwufs_inode), i);
+		status = write_inode(fd, &free_inode, sizeof(free_inode), i);
 		if (status < 0) {
 			perror("mkfs.uwu: error init inodes2");
 			close(fd);
@@ -186,6 +187,7 @@ static void init_inodes2(int fd,
 static void init_root_directory(int fd)
 {
 	struct uwufs_inode root_inode;
+	ssize_t status;
 
 	// TODO: Abstract this to add_directory_file_entry (which is
 	// 		different from create_directory_file_entry)
@@ -194,32 +196,24 @@ static void init_root_directory(int fd)
 	
 	// Add . and .. entry
 	struct uwufs_directory_data_blk dir_blk;
-	memset(&dir_blk, 0, sizeof(struct uwufs_directory_data_blk));
-	ssize_t status1 = put_directory_file_entry(&dir_blk, ".",
-											UWUFS_ROOT_DIR_INODE);
-	ssize_t status2 = put_directory_file_entry(&dir_blk, "..",
-											UWUFS_ROOT_DIR_INODE);
-	if (status1 < 0 || status2 < 0) {
-		perror("mkfs.uwu: cannot add . and .. in init root dir");
-		close(fd);
-		exit(1);
-	}
+	memset(&dir_blk, 0, sizeof(dir_blk));
+	status = put_directory_file_entry(&dir_blk, ".", UWUFS_ROOT_DIR_INODE);
+	if (status < 0)
+		goto error_exit;
+	status = put_directory_file_entry(&dir_blk, "..", UWUFS_ROOT_DIR_INODE);
+	if (status < 0)
+		goto error_exit;
 
 	// Allocate a data block for . and ..
 	uwufs_blk_t blk_num;
-	ssize_t status = malloc_blk(fd, &blk_num);
-	if (status < 0 || blk_num <= 0) {
-		perror("mkfs.uwu: init root directory - cannot allocate data blk");
-		close(fd);
-		exit(1);
-	}
+	status = malloc_blk(fd, &blk_num);
+	if (status < 0 || blk_num <= 0)
+		goto error_exit;
+
 	// Write entries to actual data block
 	status = write_blk(fd, &dir_blk, UWUFS_BLOCK_SIZE, blk_num);
-	if (status < 0) {
-		perror("mkfs.uwu: error writing to data blk");
-		close(fd);
-		exit(1);
-	}
+	if (status < 0)
+		goto error_exit;
 
 	// TODO: add other permissions, metadata, etc
 	root_inode.access_flags = F_TYPE_DIRECTORY | 0755;
@@ -227,13 +221,17 @@ static void init_root_directory(int fd)
 	root_inode.file_size = UWUFS_BLOCK_SIZE;
 
 	// Write to root inode
-	status = write_inode(fd, &root_inode, sizeof(struct uwufs_inode),
+	status = write_inode(fd, &root_inode, sizeof(root_inode),
 							  UWUFS_ROOT_DIR_INODE);
-	if (status < 0) {
-		perror("mkfs.uwu: error init root directory");
-		close(fd);
-		exit(1);
-	}
+	if (status < 0)
+		goto error_exit;
+
+	return;
+
+error_exit:
+	perror("mkfs.uwu: error init root directory");
+	close(fd);
+	exit(1);
 }
 
 /**

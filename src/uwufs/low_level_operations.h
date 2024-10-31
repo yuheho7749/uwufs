@@ -95,6 +95,6 @@ ssize_t find_free_inode(int fd, uwufs_blk_t *inode_num);
  * 	`path`: null terminated file path
  * 	`root_dir_inode`: can be optionally provided to save a super blk read
  */
-ssize_t namei(int fd, const char *path, const uwufs_inode *root_dir_inode);
+ssize_t namei(int fd, const char *path, const struct uwufs_inode *root_dir_inode);
 
 #endif

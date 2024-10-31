@@ -39,9 +39,9 @@ int uwufs_getattr(const char *path,
 
 	// TODO: Use namei to search for the corresponding dir inode
 	// TEMP: Hard coding for root directory only for now
-	if (strcmp(path, "/") != 0) {
+	if (strcmp(path, "/") != 0)
 		return -ENOENT; // TEMP:
-	}
+
 	// uwufs_blk_t inode_num = namei(path);
 	uwufs_blk_t inode_num = UWUFS_ROOT_DIR_INODE;
 
@@ -49,9 +49,8 @@ int uwufs_getattr(const char *path,
 
 	struct uwufs_inode inode;
 	int status = read_inode(device_fd, &inode, inode_num);
-	if (status < 0) {
+	if (status < 0)
 		return -ENOENT;
-	}
 
 	// TODO: Fill in other file types and flags (not implemented yet)
 	uwufs_aflags_t flags = inode.access_flags;
@@ -77,9 +76,8 @@ int uwufs_mkdir(const char *path,
 				mode_t mode)
 {
 	// TEMP: don't care if it's not a dir
-	if (!(mode | S_IFDIR)) {
+	if (!(mode | S_IFDIR))
 		return -ENOTDIR;
-	}
 
 	// TODO:
 	return -ENOENT;
@@ -149,22 +147,20 @@ int uwufs_readdir(const char *path,
 
 	// TODO: Use namei to search for the corresponding dir inode
 	// TEMP: Hard coding for root directory only for now
-	if (strcmp(path, "/") != 0) {
+	if (strcmp(path, "/") != 0)
 		return -ENOENT; // TEMP:
-	}
+
 	// uwufs_blk_t inode_num = namei(path);
 	uwufs_blk_t inode_num = UWUFS_ROOT_DIR_INODE;
 
 	struct uwufs_inode inode;
 	int status = read_inode(device_fd, &inode, inode_num);
-	if (status < 0) {
+	if (status < 0)
 		return -ENOENT;
-	}
 
 	uwufs_aflags_t aflags = inode.access_flags;
-	if (F_TYPE_DIRECTORY != (aflags & F_TYPE_BITS)) {
+	if (F_TYPE_DIRECTORY != (aflags & F_TYPE_BITS))
 		return -ENOTDIR;
-	}
 
 	// TODO: Don't worry about permission bits yet (but still show it)
 
@@ -181,16 +177,16 @@ int uwufs_readdir(const char *path,
 	{
 		status = read_blk(device_fd, &dir_data_blk,
 					inode.direct_blks[dir_blk_num]);
-		if (status < 0) {
+		if (status < 0)
 			return -EIO;
-		}
+
 		// At this point I have the dir data block
 		status = uwufs_helper_readdir_blk(dir_data_blk, buf, filler);
-		if (status == 1) {
+		if (status == 1)
 			// If buf is full, filler/helper will return 1
 			// return error or just not include the rest?
 			return 0;
-		}
+
 		dir_blk_num ++;
 	}
 	// TODO: Dont' worry about indirects yet
