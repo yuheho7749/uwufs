@@ -9,5 +9,7 @@ A universal and (hopefully) working userspace filesystem for 64-bit linux-like s
 3. Start and mount the fuse filesystem with `./phase1 [your/mnt/point/] [optional: flags]`. You can optionally include the `-f` flag to make fuse run in the foreground.
 4. Writing to any file in the mounted fuse filesystem will send an email.
 
-## Phase2: A working uwufs
-TBD
+## Phase2: Build, format, and mount uwufs
+1. Run `make mkfs.uwu` and `make mount.uwu` (or `make all`) to build binaries. You can add `DEBUG=1` to compile with debug information.
+2. Run `./mkfs.uwu [device]` with elevated privileges to format your block device
+3. Run `./mount.uwu [device] [mountpoint] [optional: flags]` to mount the block device and start the fuse daemon. You can optionally include `-f` flag to make fuse run in the forground.

@@ -1,7 +1,7 @@
 /**
- *	Formats block device in the uwufs format.
+ * Formats block device in the uwufs format.
  *
- *	Author: Joseph
+ * Author: Joseph
  */
 
 
@@ -12,17 +12,21 @@
 #include <assert.h>
 #include <string.h>
 #include <sys/ioctl.h>
+
+#ifdef __linux__
 #include <linux/fs.h>
+#endif
 
 #include "uwufs.h"
 #include "low_level_operations.h"
+#include "file_operations.h"
 
 
 /**
- * 	Creates a linked list structure for the freelist
+ * Creates a linked list structure for the freelist
  * 
  * TODO:
- * 	Need to use a more efficient method of storing a freelist
+ * Need to use a more efficient method of storing a freelist
  */
 static uwufs_blk_t init_freelist(int fd,
 								 uwufs_blk_t total_blks,
@@ -38,6 +42,7 @@ static uwufs_blk_t init_freelist(int fd,
 	assert(freelist_end <= total_blks);
 
 	// Connect the blocks in the free lists
+	ssize_t bytes_written;
 	uwufs_blk_t current_blk_num = freelist_start;
 	uwufs_blk_t next_blk_num = current_blk_num + 1;
 	struct uwufs_free_data_blk free_data_blk;
@@ -53,12 +58,10 @@ static uwufs_blk_t init_freelist(int fd,
 		free_data_blk.next_free_blk = next_blk_num;
 		
 		// Write block to device
-		ssize_t bytes_written = write_blk(fd, &free_data_blk, UWUFS_BLOCK_SIZE, current_blk_num);
-		if (bytes_written != UWUFS_BLOCK_SIZE) {
-			perror("mkfs.uwu: failed writing freelist");
-			close(fd);
-			exit(1);
-		}
+		bytes_written = write_blk(fd, &free_data_blk, UWUFS_BLOCK_SIZE,
+							current_blk_num);
+		if (bytes_written != UWUFS_BLOCK_SIZE)
+			goto error_exit;
 
 		current_blk_num = next_blk_num;
 		next_blk_num ++;
@@ -67,19 +70,21 @@ static uwufs_blk_t init_freelist(int fd,
 	// Write 0 to last blk
 	free_data_blk.next_free_blk = 0;
 
-	ssize_t bytes_written = write_blk(fd, &free_data_blk, UWUFS_BLOCK_SIZE,
-								      current_blk_num);
-	if (bytes_written != UWUFS_BLOCK_SIZE) {
-		perror("mkfs.uwu: failed writing freelist");
-		close(fd);
-		exit(1);
-	}
+	bytes_written = write_blk(fd, &free_data_blk, UWUFS_BLOCK_SIZE,
+						   current_blk_num);
+	if (bytes_written != UWUFS_BLOCK_SIZE)
+		goto error_exit;
 	
 	return freelist_start;
+
+error_exit:
+	perror("mkfs.uwu: failed writing freelist");
+	close(fd);
+	exit(1);
 }
 
 /**
- * 	Initializes the superblock. Assumes that `init_freelist` was already 
+ * Initializes the superblock. Assumes that `init_freelist` was already 
  * 		called and had initialized a freelist. The blk address of the
  * 		freelist head will be passed in `freelist_head`
  */
@@ -110,7 +115,7 @@ static void init_superblock(int fd,
 }
 
 /**
- * 	Set ilist blocks to all 0. This makes checking if an inode
+ * Set ilist blocks to all 0. This makes checking if an inode
  * 		is used very easy (Check the access flag if it is 0)
  */
 static void init_inodes(int fd,
@@ -141,9 +146,9 @@ static void init_inodes(int fd,
 	
 
 /**
- * 	TODO:
- * 	TEST:
- * 	Make inodes a linked list for easy allocation and deallocation of
+ * TODO:
+ * TEST:
+ * Make inodes a linked list for easy allocation and deallocation of
  * 		inodes.
  */
 static void init_inodes2(int fd,
@@ -166,7 +171,7 @@ static void init_inodes2(int fd,
 				i, total_inodes);
 		}
 #endif
-		status = write_inode(fd, &free_inode, sizeof(struct uwufs_inode), i);
+		status = write_inode(fd, &free_inode, sizeof(free_inode), i);
 		if (status < 0) {
 			perror("mkfs.uwu: error init inodes2");
 			close(fd);
@@ -176,32 +181,66 @@ static void init_inodes2(int fd,
 }
 
 /**
- * 	Initialize root directory at inode UWUFS_ROOT_DIR_INODE
+ * Initialize root directory at inode UWUFS_ROOT_DIR_INODE
  */
 static void init_root_directory(int fd)
 {
 	struct uwufs_inode root_inode;
-	root_inode.access_flags = F_TYPE_REGULAR | 755;
-	// NOTE: Maybe need to allocate a data block as well for . and ..?
+	ssize_t status;
 
-	// write to actual block
-	ssize_t status = write_inode(fd, &root_inode, sizeof(struct uwufs_inode),
+	// TODO: Abstract this to add_directory_file_entry (which is
+	// 		different from create_directory_file_entry)
+	// 		add_directory_file_entry should do the malloc_blk if
+	// 		there is no additional space in its allocated data blks
+	
+	// Add . and .. entry
+	struct uwufs_directory_data_blk dir_blk;
+	memset(&dir_blk, 0, sizeof(dir_blk));
+	status = put_directory_file_entry(&dir_blk, ".", UWUFS_ROOT_DIR_INODE);
+	if (status < 0)
+		goto error_exit;
+	status = put_directory_file_entry(&dir_blk, "..", UWUFS_ROOT_DIR_INODE);
+	if (status < 0)
+		goto error_exit;
+
+	// Allocate a data block for . and ..
+	uwufs_blk_t blk_num;
+	status = malloc_blk(fd, &blk_num);
+	if (status < 0 || blk_num <= 0)
+		goto error_exit;
+
+	// Write entries to actual data block
+	status = write_blk(fd, &dir_blk, UWUFS_BLOCK_SIZE, blk_num);
+	if (status < 0)
+		goto error_exit;
+
+	// TODO: add other permissions, metadata, etc
+	root_inode.access_flags = F_TYPE_DIRECTORY | 0755;
+	root_inode.direct_blks[0] = blk_num;
+	root_inode.file_size = UWUFS_BLOCK_SIZE;
+
+	// Write to root inode
+	status = write_inode(fd, &root_inode, sizeof(root_inode),
 							  UWUFS_ROOT_DIR_INODE);
-	if (status < 0) {
-		perror("mkfs.uwu: error init root directory");
-		close(fd);
-		exit(1);
-	}
+	if (status < 0)
+		goto error_exit;
+
+	return;
+
+error_exit:
+	perror("mkfs.uwu: error init root directory");
+	close(fd);
+	exit(1);
 }
 
 /**
- * 	Formats the block device to uwufs format.
+ * Formats the block device to uwufs format.
  *
- * 	`fd`: the opened block device
- * 	`total_blks`: total blocks in the opened block device
- * 	`reserved_space`: number of blocks reserved after superblock
+ * `fd`: the opened block device
+ * `total_blks`: total blocks in the opened block device
+ * `reserved_space`: number of blocks reserved after superblock
  * 		and before the start of i-list
- * 	`ilist_percent`: percentage of total_blks used for i-list
+ * `ilist_percent`: percentage of total_blks used for i-list
  */
 static int init_uwufs(int fd,
 					  uwufs_blk_t total_blks,
@@ -257,9 +296,17 @@ int main(int argc, char *argv[])
 
 	// Get and check size of block device
 	uwufs_blk_t blk_dev_size;
-	ret = ioctl(fd, BLKGETSIZE64, &blk_dev_size); // Assumes linux system
+
+#ifdef __linux__
+	// BLKGETSIZE64 assumes linux system
+	ret = ioctl(fd, BLKGETSIZE64, &blk_dev_size);
+#else
+	perror("Unsupported operating system: not Linux");
+	close(fd);
+	return 1;
+#endif
 	if (ret < 0) {
-		perror("Not a block device or cannot determine size of device");
+		perror("Not a block device/partition or cannot determine its size");
 		close(fd);
 		return 1;
 	}

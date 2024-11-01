@@ -30,9 +30,12 @@
 
 
 ## Super block
-- Head of free list
-- Size of i-list
-- Total number of blocks in partition
+- Total blks
+- Ilist start
+- Ilist total size
+- Freelist start
+- Freelist total size
+- Freelist head
 
 ## Free list
 Simple linked list
@@ -46,15 +49,14 @@ Root directory is inode 2
 
 File entry is 64 bytes total (56 for file name + 8 bytes for inode)
 
-### Regular Files
+### Files
 10 direct
 1 indirect
 1 double indirect
 1 triple indirect
 
-directory/file
-handle permissions etc later
-
+file type/permissions
+- handle actual checking of permissions later
 
 
 ------------------------------------

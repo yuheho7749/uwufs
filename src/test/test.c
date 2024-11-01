@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
 
 	// ----- Read root directory inode info -----
 	struct uwufs_inode root_directory_inode;
-	status = read_inode(fd, &root_directory_inode, 2);
+	status = read_inode(fd, &root_directory_inode, UWUFS_ROOT_DIR_INODE);
 	if (status < 0) {
 		perror("Failed to read root dir inode");
 		close(fd);
@@ -77,8 +77,28 @@ int main(int argc, char* argv[]) {
 	}
 	printf("Root Directory Inode:\n");
 	uint16_t flags = root_directory_inode.access_flags;
+	uint64_t dir_size = root_directory_inode.file_size;
 	printf("\tFile type: %d\n", (flags & F_TYPE_BITS) >> 12);
-	printf("\tFile perm: %d\n", flags & F_PERM_BITS);
+	printf("\tFile perm: %o\n", flags & F_PERM_BITS);
+	printf("\tDir size (raw): %lu\n", dir_size);
+
+	// ----- Read freelist head using super blk info -----
+	struct uwufs_directory_data_blk dir_data_blk;
+	status = read_blk(fd, &dir_data_blk, root_directory_inode.direct_blks[0]);
+	if (status < 0) {
+		perror("Failed to read first data blk of root dir");
+		close(fd);
+		exit(1);
+	}
+	printf("Root Directory Entries (first block only):\n");
+	int i;
+	for (i = 0; i < 64; i ++) {
+		if (dir_data_blk.file_entries[i].inode_num <= 0) {
+			continue;
+		}
+		printf("\t%lu\t%s\n", dir_data_blk.file_entries[i].inode_num,
+		 	   dir_data_blk.file_entries[i].file_name);
+	}
 
 	// ----- Read freelist head using super blk info -----
 	struct uwufs_free_data_blk free_blk;
@@ -115,7 +135,8 @@ int main(int argc, char* argv[]) {
 	printf("Random Inode:\n");
 	flags = random_inode.access_flags;
 	printf("\tFile type: %d\n", (flags & F_TYPE_BITS) >> 12);
-	printf("\tFile perm: %d\n", flags & F_PERM_BITS);
+	printf("\tFile perm: %o\n", flags & F_PERM_BITS);
+	printf("\tDir size (raw): %lu\n", random_inode.file_size);
 
 	close(fd);
 	return ret;
