@@ -85,6 +85,21 @@ ssize_t free_blk(int fd, const uwufs_blk_t blk_num);
  */
 ssize_t find_free_inode(int fd, uwufs_blk_t *inode_num);
 
+
+/**
+ * namei helper - scan the set of data blocks for an inode, 
+ * searching for a file name path entry. 
+ * returns the inode number for that file, or -1 if not found
+ * 
+ * `fd`: block device
+ * `file_name`: the file of which to find the next inode for
+ * `inode`: the inode to search in 
+ * 
+ * TODO: only scans direct blks for now
+ */
+ssize_t search_for_next_inode(int fd, char *file_name, struct uwufs_inode* inode);
+
+
 /**
  * TODO:
  * Find the inode of the corresponding file. If root directory inode is
