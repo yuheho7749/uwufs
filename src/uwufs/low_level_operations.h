@@ -16,7 +16,7 @@
  * The block size is determined by UWUFS_BLOCK_SIZE (see uwufs.h)
  *
  * `fd`: block device
- * `buf`: output var to be read into (must be at least UWUFS_BLOCK_SIZE)
+ * `buf`: output var to be read into (size must be at least UWUFS_BLOCK_SIZE)
  * `blk_num`: block number to be read
  */
 ssize_t read_blk(int fd, void* buf, uwufs_blk_t blk_num);
@@ -26,11 +26,10 @@ ssize_t read_blk(int fd, void* buf, uwufs_blk_t blk_num);
  * The buf size must be exactly UWUFS_BLOCK_SIZE (see uwufs.h)
  *
  * `fd`: block device
- * `buf`: data to write to block device (must be exactly UWUFS_BLOCK_SIZE)
- * `size`: must be UWUFS_BLOCK_SIZE (might change if implementation changes)
+ * `buf`: data to write to block device (size must be UWUFS_BLOCK_SIZE)
  * `blk_num`: block number to write to
  */
-ssize_t write_blk(int fd, const void* buf, size_t size, uwufs_blk_t blk_num);
+ssize_t write_blk(int fd, const void* buf, uwufs_blk_t blk_num);
 
 /**
  * Reads an inode from the specified block device.

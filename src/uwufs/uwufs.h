@@ -28,8 +28,8 @@
 // Total file entry in a directory is 64 bytes
 #define UWUFS_FILE_NAME_SIZE			56
 
-/* File access flags */
-typedef uint16_t uwufs_aflags_t;
+/* File access mode */
+typedef uint16_t uwufs_aflags_t; // Deprecated (use uint16_t directly)
 // File types
 #define F_TYPE_BITS						0b1111000000000000
 // NOTE: Might change to match stat.h file types?
@@ -72,7 +72,7 @@ struct __attribute__((__packed__)) uwufs_inode {
 	uwufs_blk_t single_indirect_blks;
 	uwufs_blk_t double_indirect_blks;
 	uwufs_blk_t triple_indirect_blks;
-	uwufs_aflags_t access_flags; 		// file types/permissions
+	uint16_t file_mode; 		// file types/permissions
 	uint64_t file_size;
 	// TODO: owner, num of links, etc
 	
