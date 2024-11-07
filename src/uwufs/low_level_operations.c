@@ -180,16 +180,18 @@ debug_msg_ret:
 }
 
 ssize_t find_free_inode(int fd, uwufs_blk_t *inode_num) {
-    // read superblk for ilist start & size
-	struct uwufs_super_blk super_blk;
-	ssize_t status = read_blk(fd, &super_blk, 0);
-	if (status < 0)
-		goto debug_msg_ret;
-	
-	// buffers for inode blk and inode
+    // buffers for inode blk and inode
     struct uwufs_inode_blk inode_blk;
     struct uwufs_inode inode;
-    uwufs_blk_t current_inode_blk = super_blk.ilist_start;
+    uwufs_blk_t current_inode_blk;
+	
+	// read superblk for ilist start & size
+	struct uwufs_super_blk super_blk;
+	ssize_t status = read_blk(fd, &super_blk, 0);
+	
+	if (status < 0)
+		goto debug_msg_ret;
+	current_inode_blk = super_blk.ilist_start;
 
     // read one inode block at a time 
     while (current_inode_blk < 
@@ -260,7 +262,7 @@ ssize_t next_inode_in_path(int fd,
 			}
 		}
 	}
-	return -1; //not found
+	return 0; //not found
 
 debug_msg_ret:
 #ifdef DEBUG
@@ -292,11 +294,12 @@ ssize_t namei(int fd,
 	char full_path[UWUFS_FILE_NAME_SIZE];
 	strncpy(full_path, path, strlen(path)); 
 	char* strtok_ptr;
-
-	char *path_segment = __strtok_r(full_path, "/", &strtok_ptr);
+	char *path_segment;
+	
+	path_segment = __strtok_r(full_path, "/", &strtok_ptr);
 	while (path_segment != NULL) {
 		// regular file
-		if (current_inode.access_flags & F_TYPE_BITS == F_TYPE_REGULAR) {
+		if ((current_inode.access_flags & F_TYPE_BITS) == F_TYPE_REGULAR) {
 			path_segment = __strtok_r(NULL, "/", &strtok_ptr);
 			
 			if (path_segment != NULL) 
@@ -304,7 +307,7 @@ ssize_t namei(int fd,
 			break;
 		}
 		// directory
-		else if (current_inode.access_flags & F_TYPE_BITS == F_TYPE_DIRECTORY) {
+		else if ((current_inode.access_flags & F_TYPE_BITS) == F_TYPE_DIRECTORY) {
 			status = next_inode_in_path(fd, path_segment, &current_inode,
 										&current_inode_number);
 		}
@@ -315,7 +318,7 @@ ssize_t namei(int fd,
 			read_blk(fd, &symlink_data, current_inode.direct_blks[0]); 
 
 			char symlink_path[UWUFS_FILE_NAME_SIZE];
-			strncpy(symlink_path, &symlink_data, UWUFS_FILE_NAME_SIZE); 
+			strncpy(symlink_path, symlink_data.data, UWUFS_FILE_NAME_SIZE); 
 
 			// start following the new path in the symlink
 			// TODO: maybe add an argument to namei() call that counts the # symlink
@@ -324,7 +327,7 @@ ssize_t namei(int fd,
 		}
 
 		// have next inode num so read in next block & get next path segment
-		if (status < 0 || current_inode_number == -1)
+		if (status < 0 || current_inode_number == 0)
 			goto debug_msg_ret;
 		status = read_inode(fd, &current_inode, current_inode_number);
 		if (status < 0) 
