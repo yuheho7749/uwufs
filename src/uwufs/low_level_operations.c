@@ -281,21 +281,23 @@ ssize_t namei(int fd,
 	struct uwufs_inode current_inode; 
 	ssize_t status;
 
-	if (root_dir_inode != NULL) {
+	if (root_dir_inode != NULL) 
 		memcpy(&current_inode, root_dir_inode, UWUFS_INODE_DEFAULT_SIZE);
-	}
 	else {
 		status = read_inode(fd, &current_inode, current_inode_number);
 		if (status < 0)
-			goto debug_msg_ret;
+#ifdef DEBUG
+	perror("couldn't read root dir inode");
+#endif
+			return status;
 	}
 
 	//since strtok can modify the original string, copy it
-	char full_path[UWUFS_FILE_NAME_SIZE];
+	char full_path[strlen(path)];
 	strncpy(full_path, path, strlen(path)); 
 	char* strtok_ptr;
 	char *path_segment;
-	
+
 	path_segment = __strtok_r(full_path, "/", &strtok_ptr);
 	while (path_segment != NULL) {
 		// regular file
@@ -317,8 +319,8 @@ ssize_t namei(int fd,
 			// assumes symlink contents stored in first direct blk
 			read_blk(fd, &symlink_data, current_inode.direct_blks[0]); 
 
-			char symlink_path[UWUFS_FILE_NAME_SIZE];
-			strncpy(symlink_path, symlink_data.data, UWUFS_FILE_NAME_SIZE); 
+			char symlink_path[strlen(symlink_data.data)];
+			strncpy(symlink_path, symlink_data.data, strlen(symlink_data.data)); 
 
 			// start following the new path in the symlink
 			// TODO: maybe add an argument to namei() call that counts the # symlink
