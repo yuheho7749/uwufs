@@ -3,6 +3,7 @@
  */
 
 #include "low_level_operations.h"
+#include "file_operations.h"
 #include "uwufs.h"
 
 #include <fcntl.h>
@@ -346,3 +347,4 @@ debug_msg_ret:
 #endif
 	return status;
 }
+

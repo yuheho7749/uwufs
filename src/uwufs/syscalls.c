@@ -7,7 +7,7 @@
 #define FUSE_USE_VERSION 31
 
 #include <fuse3/fuse.h>
-
+#include "file_operations.h"
 #include "low_level_operations.h"
 #include "uwufs.h"
 #include "syscalls.h"
@@ -71,16 +71,125 @@ int uwufs_getattr(const char *path,
 	return -ENOENT;
 }
 
-// TODO:
+
+ssize_t split_path_parent_child(const char *path, char *parent_path, char *child_dir) {
+    char path_copy[strlen(path)];
+	strcpy(path_copy, path);
+	char *last_dir = strrchr(path_copy, '/');
+    
+    if (last_dir != NULL) {
+        size_t length = last_dir - path_copy;
+        strncpy(parent_path, path_copy, length);
+        parent_path[length] = '\0';
+
+		size_t child_dir_length = strlen(last_dir+1);
+		if (child_dir_length > UWUFS_FILE_NAME_SIZE) {
+			strncpy(child_dir, last_dir+1, UWUFS_FILE_NAME_SIZE);
+		}
+		else {
+			strncpy(child_dir, last_dir+1, child_dir_length);
+		}
+		return 0;
+    } else {
+        // if no '/' is found, error
+		// paths should all start from root (?)
+		return -1;
+    }
+}
+
+// TODO: 
+// 1) namei() with the path up to the directory to be created
+// return if namei errors or the lead-up path isn't found
+// 2) find_free_inode() to get the inode to use 
+// 3) update the parent dir data blk with a new entry
+// 3) malloc & write the new dir data block
+// 	- an entry for '.' and '..'
+// 4) write the new dir inode
 int uwufs_mkdir(const char *path,
 				mode_t mode)
 {
 	// TEMP: don't care if it's not a dir
 	if (!(mode | S_IFDIR))
 		return -ENOTDIR;
+	
+	ssize_t status;
 
-	// TODO:
-	return -ENOENT;
+	// split path into parent + child parts
+	char parent_path[strlen(path)];
+	char child_dir[UWUFS_FILE_NAME_SIZE];
+	status = split_path_parent_child(path, parent_path, child_dir);
+	if (status < 0)
+		return -ENOENT;
+
+	// read root inode for namei
+	struct uwufs_inode root_inode;
+	status = read_inode(device_fd, &root_inode, UWUFS_ROOT_DIR_INODE);
+	if (status < 0)
+		return -ENOENT;
+
+	// find the parent path inode
+	uwufs_blk_t parent_dir_inode_num;
+	namei(device_fd, parent_path, &root_inode, &parent_dir_inode_num);
+	// read in the parent inode
+	struct uwufs_inode parent_dir_inode;
+	read_inode(device_fd, &parent_dir_inode, parent_dir_inode_num);
+
+	// find free inode for new child dir
+	uwufs_blk_t child_dir_inode_num;
+	find_free_inode(device_fd, &child_dir_inode_num);
+
+	// update the parent data blk
+	// TODO: assumes space in the first dir blk entry
+	// need new fn to find which dir blk to update/alloc new blk if needed
+	struct uwufs_directory_data_blk parent_dir_blk;
+	uwufs_blk_t parent_dir_blk_num = parent_dir_inode.direct_blks[0];
+	read_blk(device_fd, &parent_dir_blk, parent_dir_blk_num);
+	status = put_directory_file_entry(&parent_dir_blk, child_dir, 
+									  child_dir_inode_num);
+	if (status < 0)
+		return -ENOENT;
+
+	// write back parent data blk
+	status = write_blk(device_fd, &parent_dir_blk, UWUFS_BLOCK_SIZE,
+					   parent_dir_blk_num);
+	if (status < 0)
+		return -ENOENT;
+
+	// new child dir: populate . and .. entry
+	struct uwufs_directory_data_blk new_dir_blk;
+	memset(&new_dir_blk, 0, sizeof(new_dir_blk));
+	status = put_directory_file_entry(&new_dir_blk, ".", child_dir_inode_num);
+	if (status < 0)
+		return -ENOENT;
+	status = put_directory_file_entry(&new_dir_blk, "..", parent_dir_inode_num);
+	if (status < 0)
+		return -ENOENT;
+
+	// allocate a new data blk
+	uwufs_blk_t new_blk_num;
+	status = malloc_blk(device_fd, &new_blk_num);
+	if (status < 0 || new_blk_num <= 0)
+		return -ENOENT;
+
+	// Write entries to actual data block
+	status = write_blk(device_fd, &new_dir_blk, UWUFS_BLOCK_SIZE, new_blk_num);
+	if (status < 0)
+		return -ENOENT;
+
+	// TODO: add other permissions, metadata, etc
+	struct uwufs_inode new_inode;
+	memset(&new_inode, 0, UWUFS_INODE_DEFAULT_SIZE);
+	new_inode.access_flags = F_TYPE_DIRECTORY | 0755;
+	new_inode.direct_blks[0] = new_blk_num;
+	new_inode.file_size = UWUFS_BLOCK_SIZE;
+
+	// write new dir inode
+	status = write_inode(device_fd, &new_inode, sizeof(new_inode),
+						 child_dir_inode_num);
+	if (status < 0)
+		return -ENOENT;
+
+	return 0;
 }
 
 // TODO:
