@@ -45,11 +45,13 @@ ssize_t put_directory_file_entry(struct uwufs_directory_data_blk *dir_blk,
  * 		space on storage device (no more blocks can be allocated)
  *
  * Parameters:
+ * `fd`: block device
  * `dir_inode_num`: a valid data block number
  * `name`: name of the new file
  * `file_inode_num`: file inode to associate `name` to
  */
-ssize_t add_directory_file_entry(const uwufs_blk_t dir_inode_num,
+ssize_t add_directory_file_entry(int fd,
+								 const uwufs_blk_t dir_inode_num,
 								 const char name[UWUFS_FILE_NAME_SIZE],
 								 uwufs_blk_t file_inode_num);
 #endif
