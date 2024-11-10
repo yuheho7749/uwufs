@@ -35,5 +35,9 @@ mount.uwu: $(COMMON_FILES) $(SRC_DIR)/uwufs/mount_uwufs.c $(SRC_DIR)/uwufs/sysca
 test: $(COMMON_FILES) $(SRC_DIR)/test/test.c
 	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
 
+# C++ test
+cpp_test: $(COMMON_FILES) $(SRC_DIR)/test/test.c
+	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
+
 clean:
 	rm -f $(BUILD_DIR)/*.o phase1 mkfs.uwu test mount.uwu
