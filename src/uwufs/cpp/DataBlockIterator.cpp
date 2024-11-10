@@ -33,7 +33,7 @@ std::unique_ptr<IndirectBlockIterator> SingleIndirectBlockIterator::next_itr() {
     if (!iblk || current_index >= UWUFS_BLOCK_SIZE / sizeof(uwufs_blk_t)) {
         return nullptr;
     }
-    return std::make_unique<DoubleIndirectBlockIterator>(inode->double_indirect, device_fd, 0, 0);
+    return std::make_unique<DoubleIndirectBlockIterator>(inode->double_indirect_blks, device_fd, inode, 0, 0);
 }
 
 DoubleIndirectBlockIterator::DoubleIndirectBlockIterator(uwufs_blk_t iblk_no, int device_fd, const uwufs_inode* inode, uwufs_blk_t start_i, uwufs_blk_t start_j)
@@ -59,7 +59,7 @@ std::unique_ptr<IndirectBlockIterator> DoubleIndirectBlockIterator::next_itr() {
     if (!single_itr) {
         return nullptr;
     }
-    return std::make_unique<TripleIndirectBlockIterator>(inode->triple_indirect, device_fd, 0, 0, 0);
+    return std::make_unique<TripleIndirectBlockIterator>(inode->triple_indirect_blks, device_fd, inode, 0, 0, 0);
 }
 
 TripleIndirectBlockIterator::TripleIndirectBlockIterator(uwufs_blk_t iblk_no, int device_fd, const uwufs_inode* inode, uwufs_blk_t start_i, uwufs_blk_t start_j, uwufs_blk_t start_k)
@@ -91,13 +91,13 @@ DataBlockIterator::DataBlockIterator(const uwufs_inode* inode, int device_fd, uw
         current_index = start_index;
     }
     else if (start_index < INode::LEVEL_1_BLOCKS) {
-        itr = std::make_unique<SingleIndirectBlockIterator>(inode->indirect, device_fd, inode, start_index - INode::LEVEL_0_BLOCKS);
+        itr = std::make_unique<SingleIndirectBlockIterator>(inode->single_indirect_blks, device_fd, inode, start_index - INode::LEVEL_0_BLOCKS);
     }
     else if (start_index < INode::LEVEL_2_BLOCKS) {
         start_index -= INode::LEVEL_1_BLOCKS;
         auto i = start_index / (INode::LEVEL_2_BLOCKS - INode::LEVEL_1_BLOCKS);
         auto j = start_index % (INode::LEVEL_2_BLOCKS - INode::LEVEL_1_BLOCKS);
-        itr = std::make_unique<DoubleIndirectBlockIterator>(inode->double_indirect, device_fd, inode, i, j);
+        itr = std::make_unique<DoubleIndirectBlockIterator>(inode->double_indirect_blks, device_fd, inode, i, j);
     }
     else {
         start_index -= INode::LEVEL_2_BLOCKS;
@@ -105,17 +105,17 @@ DataBlockIterator::DataBlockIterator(const uwufs_inode* inode, int device_fd, uw
         auto rem = start_index % (INode::LEVEL_3_BLOCKS - INode::LEVEL_2_BLOCKS);
         auto j = rem / (INode::LEVEL_2_BLOCKS - INode::LEVEL_1_BLOCKS);
         auto k = rem % (INode::LEVEL_2_BLOCKS - INode::LEVEL_1_BLOCKS);
-        itr = std::make_unique<TripleIndirectBlockIterator>(inode->triple_indirect, device_fd, inode, i, j, k);
+        itr = std::make_unique<TripleIndirectBlockIterator>(inode->triple_indirect_blks, device_fd, inode, i, j, k);
     }
 }
 
 DataBlockIterator::value_type DataBlockIterator::next() {
     if (!itr) { // in direct blocks
         if (current_index >= INode::LEVEL_0_BLOCKS) {
-            itr = std::make_unique<SingleIndirectBlockIterator>(inode->indirect, device_fd, inode, 0);
+            itr = std::make_unique<SingleIndirectBlockIterator>(inode->single_indirect_blks, device_fd, inode, 0);
         }
         else {
-            return inode->direct[current_index++];
+            return inode->direct_blks[current_index++];
         }
     }
     auto blk_no = itr->next();

@@ -16,7 +16,7 @@ endif
 SRC_DIR = src
 BUILD_DIR = build
 
-COMMON_FILES = $(SRC_DIR)/uwufs/uwufs.h $(SRC_DIR)/uwufs/low_level_operations.h $(SRC_DIR)/uwufs/low_level_operations.c $(SRC_DIR)/uwufs/file_operations.h $(SRC_DIR)/uwufs/file_operations.c
+COMMON_FILES = $(SRC_DIR)/uwufs/uwufs.h $(SRC_DIR)/uwufs/low_level_operations.h $(SRC_DIR)/uwufs/low_level_operations.c $(SRC_DIR)/uwufs/file_operations.h $(SRC_DIR)/uwufs/file_operations.c $(SRC_DIR)/uwufs/cpp/*.cpp
 
 all: $(BUILD_DIR) phase1 mkfs.uwu mount.uwu
 
@@ -35,8 +35,7 @@ mount.uwu: $(COMMON_FILES) $(SRC_DIR)/uwufs/mount_uwufs.c $(SRC_DIR)/uwufs/sysca
 test: $(COMMON_FILES) $(SRC_DIR)/test/test.c
 	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
 
-# C++ test
-cpp_test: $(COMMON_FILES) $(SRC_DIR)/test/test.c
+cpp_inode_tests: $(COMMON_FILES) $(SRC_DIR)/test/cpp_inode_tests.cpp
 	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
 
 clean:
