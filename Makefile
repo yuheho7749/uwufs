@@ -3,11 +3,11 @@ SUBVERSION = 2
 PATCH = 17
 EXTRAVERSION = -a
 
-DEBUG = 0
+DEBUG = 1
 FUSE_USE_VERSION = 31
 
 CC = g++
-CFLAGS = -Wall
+CFLAGS = -Wall -Wno-unused
 
 ifeq ($(DEBUG), 1)
 	CFLAGS += -g -DDEBUG

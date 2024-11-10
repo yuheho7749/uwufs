@@ -10,7 +10,6 @@
 #endif
 
 
-
 IndirectBlockIterator::IndirectBlockIterator(uwufs_blk_t iblk_no, int device_fd, const uwufs_inode* inode, uwufs_blk_t start_index)
 : device_fd(device_fd), inode(inode), current_index(start_index) {
     if (iblk_no != 0) {
@@ -30,9 +29,6 @@ SingleIndirectBlockIterator::value_type SingleIndirectBlockIterator::next() {
 }
 
 std::unique_ptr<IndirectBlockIterator> SingleIndirectBlockIterator::next_itr() {
-    if (!iblk || current_index >= UWUFS_BLOCK_SIZE / sizeof(uwufs_blk_t)) {
-        return nullptr;
-    }
     return std::make_unique<DoubleIndirectBlockIterator>(inode->double_indirect_blks, device_fd, inode, 0, 0);
 }
 
@@ -56,9 +52,6 @@ DoubleIndirectBlockIterator::value_type DoubleIndirectBlockIterator::next() {
 }
 
 std::unique_ptr<IndirectBlockIterator> DoubleIndirectBlockIterator::next_itr() {
-    if (!single_itr) {
-        return nullptr;
-    }
     return std::make_unique<TripleIndirectBlockIterator>(inode->triple_indirect_blks, device_fd, inode, 0, 0, 0);
 }
 
