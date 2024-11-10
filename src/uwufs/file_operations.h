@@ -12,13 +12,13 @@
 
 // TODO: Not Implemented yet (feel free to change function signature)
 /**
- * Creates a file using access_flags. The resulting file inode is
+ * Creates a file using file mode. The resulting file inode is
  * 		saved in `inode` output var
  *
  * `inode`: output var for inode of newly created file
  * `flags`: file type/permissions
  */
-ssize_t create_file(uwufs_blk_t *inode, uwufs_aflags_t flags);
+ssize_t create_file(uwufs_blk_t *inode, uint16_t mode);
 
 /**
  * Assumes the caller has already allocated a directory data blk.

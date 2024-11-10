@@ -58,8 +58,7 @@ static uwufs_blk_t init_freelist(int fd,
 		free_data_blk.next_free_blk = next_blk_num;
 		
 		// Write block to device
-		bytes_written = write_blk(fd, &free_data_blk, UWUFS_BLOCK_SIZE,
-							current_blk_num);
+		bytes_written = write_blk(fd, &free_data_blk, current_blk_num);
 		if (bytes_written != UWUFS_BLOCK_SIZE)
 			goto error_exit;
 
@@ -70,8 +69,7 @@ static uwufs_blk_t init_freelist(int fd,
 	// Write 0 to last blk
 	free_data_blk.next_free_blk = 0;
 
-	bytes_written = write_blk(fd, &free_data_blk, UWUFS_BLOCK_SIZE,
-						   current_blk_num);
+	bytes_written = write_blk(fd, &free_data_blk, current_blk_num);
 	if (bytes_written != UWUFS_BLOCK_SIZE)
 		goto error_exit;
 	
@@ -106,7 +104,7 @@ static void init_superblock(int fd,
 	super_blk.freelist_head = freelist_head;
 
 	// Write super block to device
-	ssize_t bytes_written = write_blk(fd, &super_blk, UWUFS_BLOCK_SIZE, 0);
+	ssize_t bytes_written = write_blk(fd, &super_blk, 0);
 	if (bytes_written != UWUFS_BLOCK_SIZE) {
 		perror("mkfs.uwu: error writing superblock");
 		close(fd);
@@ -116,7 +114,7 @@ static void init_superblock(int fd,
 
 /**
  * Set ilist blocks to all 0. This makes checking if an inode
- * 		is used very easy (Check the access flag if it is 0)
+ * 		is used very easy (Check the file mode if it is 0)
  */
 static void init_inodes(int fd,
 						uwufs_blk_t ilist_start,
@@ -134,7 +132,7 @@ static void init_inodes(int fd,
 				i, ilist_end);
 		}
 #endif
-		status = write_blk(fd, zero_blk, UWUFS_BLOCK_SIZE, i);
+		status = write_blk(fd, zero_blk, i);
 		if (status < 0) {
 			perror("mkfs.uwu: error init inode blks");
 			close(fd);
@@ -158,7 +156,7 @@ static void init_inodes2(int fd,
 		(UWUFS_BLOCK_SIZE/sizeof(struct uwufs_inode));
 
 	struct uwufs_inode free_inode;
-	free_inode.access_flags = F_TYPE_FREE;
+	free_inode.file_mode = F_TYPE_FREE;
 
 	// TODO: Might want to make a inode linked list as well?
 
@@ -210,12 +208,12 @@ static void init_root_directory(int fd)
 		goto error_exit;
 
 	// Write entries to actual data block
-	status = write_blk(fd, &dir_blk, UWUFS_BLOCK_SIZE, blk_num);
+	status = write_blk(fd, &dir_blk, blk_num);
 	if (status < 0)
 		goto error_exit;
 
 	// TODO: add other permissions, metadata, etc
-	root_inode.access_flags = F_TYPE_DIRECTORY | 0755;
+	root_inode.file_mode = F_TYPE_DIRECTORY | 0755;
 	root_inode.direct_blks[0] = blk_num;
 	root_inode.file_size = UWUFS_BLOCK_SIZE;
 

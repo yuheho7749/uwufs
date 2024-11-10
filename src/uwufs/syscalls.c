@@ -53,7 +53,7 @@ int uwufs_getattr(const char *path,
 		return -ENOENT;
 
 	// TODO: Fill in other file types and flags (not implemented yet)
-	uwufs_aflags_t flags = inode.access_flags;
+	uint16_t flags = inode.file_mode;
 	switch (flags & F_TYPE_BITS) {
 		case F_TYPE_DIRECTORY:
 			stbuf->st_mode = S_IFDIR | (flags & F_PERM_BITS);
@@ -158,7 +158,7 @@ int uwufs_readdir(const char *path,
 	if (status < 0)
 		return -ENOENT;
 
-	uwufs_aflags_t aflags = inode.access_flags;
+	uint16_t aflags = inode.file_mode;
 	if (F_TYPE_DIRECTORY != (aflags & F_TYPE_BITS))
 		return -ENOTDIR;
 
