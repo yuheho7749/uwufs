@@ -76,10 +76,10 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 	printf("Root Directory Inode:\n");
-	uint16_t flags = root_directory_inode.access_flags;
+	uint16_t f_mode = root_directory_inode.file_mode;
 	uint64_t dir_size = root_directory_inode.file_size;
-	printf("\tFile type: %d\n", (flags & F_TYPE_BITS) >> 12);
-	printf("\tFile perm: %o\n", flags & F_PERM_BITS);
+	printf("\tFile type: %d\n", (f_mode & F_TYPE_BITS) >> 12);
+	printf("\tFile perm: %o\n", f_mode & F_PERM_BITS);
 	printf("\tDir size (raw): %lu\n", dir_size);
 
 	// ----- Read freelist head using super blk info -----
@@ -133,9 +133,9 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 	printf("Random Inode:\n");
-	flags = random_inode.access_flags;
-	printf("\tFile type: %d\n", (flags & F_TYPE_BITS) >> 12);
-	printf("\tFile perm: %o\n", flags & F_PERM_BITS);
+	f_mode = random_inode.file_mode;
+	printf("\tFile type: %d\n", (f_mode & F_TYPE_BITS) >> 12);
+	printf("\tFile perm: %o\n", f_mode & F_PERM_BITS);
 	printf("\tDir size (raw): %lu\n", random_inode.file_size);
 
 	close(fd);

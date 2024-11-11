@@ -12,7 +12,7 @@
 #include <string.h>
 #include <cstdio>
 
-ssize_t create_file(uwufs_blk_t *inode, uwufs_aflags_t flags)
+ssize_t create_file(uwufs_blk_t *inode, uint16_t mode)
 {
 	// TODO:
 	return -1;

@@ -114,7 +114,7 @@ static void init_superblock(int fd,
 
 /**
  * Set ilist blocks to all 0. This makes checking if an inode
- * 		is used very easy (Check the access flag if it is 0)
+ * 		is used very easy (Check the file mode if it is 0)
  */
 static void init_inodes(int fd,
 						uwufs_blk_t ilist_start,

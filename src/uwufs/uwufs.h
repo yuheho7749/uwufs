@@ -72,7 +72,7 @@ struct __attribute__((__packed__)) uwufs_inode {
 	uwufs_blk_t single_indirect_blks;
 	uwufs_blk_t double_indirect_blks;
 	uwufs_blk_t triple_indirect_blks;
-	uint16_t file_mode; // file types/permissions
+	uint16_t file_mode; 		// file types/permissions
 	uint64_t file_size;
 	// TODO: owner, num of links, etc
 	
