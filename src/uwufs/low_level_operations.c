@@ -180,6 +180,7 @@ debug_msg_ret:
 	return status;
 }
 
+
 ssize_t find_free_inode(int fd, uwufs_blk_t *inode_num) {
     // buffers for inode blk and inode
     struct uwufs_inode_blk inode_blk;
@@ -208,16 +209,22 @@ ssize_t find_free_inode(int fd, uwufs_blk_t *inode_num) {
         for (int inode_in_blk = 0; inode_in_blk < inodes_per_block; 
 			inode_in_blk++) 
 		{
-            memcpy(&inode, &inode_blk.inodes[inode_in_blk], 
+			memcpy(&inode, &inode_blk.inodes[inode_in_blk], 
 					sizeof(struct uwufs_inode));
 
             // found a free inode
-            if (inode.access_flags == F_TYPE_FREE) {
+            if ((inode.access_flags & F_TYPE_BITS) == F_TYPE_FREE) {
         
                 // calculate inode number and return
-                uwufs_blk_t num = (current_inode_blk - super_blk.ilist_start) 
+                uwufs_blk_t num = (current_inode_blk - super_blk.ilist_start)
                                     * inodes_per_block + inode_in_blk;
+				if (num < UWUFS_ROOT_DIR_INODE) {
+					continue; // don't assign inode numbers <0-1>
+				}
                 *inode_num = num; // assign inode number 
+#ifdef DEBUG
+				printf("Found free inode: %lu\n", *inode_num);
+#endif
 				return 0;
             }
         }
@@ -255,15 +262,15 @@ ssize_t next_inode_in_path(int fd,
 			}
 			if (strcmp(dir_data_blk.file_entries[j].file_name, file_name) == 0) {
 					*inode_num = dir_data_blk.file_entries[j].inode_num;
-					return 0;
-				#ifdef DEBUG	
-					printf(f"\tResolved %s with inode number %lu\n", file_name, 
-						dir_data_blk.file_entries[j].inode_num)
-				#endif
+#ifdef DEBUG
+					printf("\t\tResolved %s with inode number %lu\n", file_name, 
+						dir_data_blk.file_entries[j].inode_num);
+#endif
+					return 0;	
 			}
 		}
 	}
-	return 0; //not found
+	return -ENOENT; //not found
 
 debug_msg_ret:
 #ifdef DEBUG
@@ -286,27 +293,29 @@ ssize_t namei(int fd,
 		memcpy(&current_inode, root_dir_inode, UWUFS_INODE_DEFAULT_SIZE);
 	else {
 		status = read_inode(fd, &current_inode, current_inode_number);
-		if (status < 0)
-#ifdef DEBUG
-	perror("couldn't read root dir inode");
-#endif
+		if (status < 0) {
+			perror("Couldn't read root dir inode");
 			return status;
+		}
 	}
 
 	//since strtok can modify the original string, copy it
 	char full_path[strlen(path)];
 	strncpy(full_path, path, strlen(path)); 
+	full_path[strlen(path)] = '\0';
 	char* strtok_ptr;
 	char *path_segment;
 
 	path_segment = __strtok_r(full_path, "/", &strtok_ptr);
 	while (path_segment != NULL) {
+		//printf("\tResolving path segment [%s]\n", path_segment);
+
 		// regular file
 		if ((current_inode.access_flags & F_TYPE_BITS) == F_TYPE_REGULAR) {
 			path_segment = __strtok_r(NULL, "/", &strtok_ptr);
 			
 			if (path_segment != NULL) 
-				return -1; // regular file found but not at leaf of path
+				return -ENOENT; // regular file found but not at leaf of path
 			break;
 		}
 		// directory

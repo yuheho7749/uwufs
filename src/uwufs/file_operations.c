@@ -10,6 +10,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <cstdio>
 
 ssize_t create_file(uwufs_blk_t *inode, uwufs_aflags_t flags)
 {
@@ -44,8 +45,6 @@ ssize_t add_directory_file_entry(int fd,
 								 const char name[UWUFS_FILE_NAME_SIZE],
 								 uwufs_blk_t file_inode_num)
 {
-	struct uwufs_directory_file_entry file_entry;
-	int n = sizeof(file_entry);
 	ssize_t status;
 
 	struct uwufs_inode dir_inode;
@@ -72,7 +71,7 @@ ssize_t add_directory_file_entry(int fd,
 			continue;
 
 		// not sure if want to keep write in this fn or move out of 
-		status = write_blk(fd, &dir_blk, sizeof(dir_blk, dir_blk_num), 
+		status = write_blk(fd, &dir_blk, sizeof(dir_blk), 
 						   dir_inode_num);
 		return 0;
 	}

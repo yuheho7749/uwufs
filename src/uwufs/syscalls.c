@@ -37,13 +37,8 @@ int uwufs_getattr(const char *path,
 {
 	(void) fi;
 
-	// TODO: Use namei to search for the corresponding dir inode
-	// TEMP: Hard coding for root directory only for now
-	if (strcmp(path, "/") != 0)
-		return -ENOENT; // TEMP:
-
-	// uwufs_blk_t inode_num = namei(path);
-	uwufs_blk_t inode_num = UWUFS_ROOT_DIR_INODE;
+	uwufs_blk_t inode_num;
+	namei(device_fd, path, NULL, &inode_num);
 
 	memset(stbuf, 0, sizeof(struct stat));
 
@@ -82,17 +77,21 @@ ssize_t split_path_parent_child(const char *path, char *parent_path, char *child
         strncpy(parent_path, path_copy, length);
         parent_path[length] = '\0';
 
-		size_t child_dir_length = strlen(last_dir+1);
+		size_t child_dir_length = strlen(last_dir+1); // start after '/'
 		if (child_dir_length > UWUFS_FILE_NAME_SIZE) {
 			strncpy(child_dir, last_dir+1, UWUFS_FILE_NAME_SIZE);
 		}
 		else {
 			strncpy(child_dir, last_dir+1, child_dir_length);
 		}
+		child_dir[child_dir_length] = '\0';
 		return 0;
     } else {
         // if no '/' is found, error
 		// paths should all start from root (?)
+#ifdef DEBUG
+		printf("Error with split_path_parent_child() function\n");
+#endif	
 		return -1;
     }
 }
@@ -124,57 +123,58 @@ int uwufs_mkdir(const char *path,
 	// read root inode for namei
 	struct uwufs_inode root_inode;
 	status = read_inode(device_fd, &root_inode, UWUFS_ROOT_DIR_INODE);
-	if (status < 0)
-		return -ENOENT;
+	RETURN_IF_ERROR(status);
 
 	// find the parent path inode
 	uwufs_blk_t parent_dir_inode_num;
-	namei(device_fd, parent_path, &root_inode, &parent_dir_inode_num);
+	status = namei(device_fd, parent_path, &root_inode, &parent_dir_inode_num);
+	if (status < 0)
+		return -ENOENT;
+
 	// read in the parent inode
 	struct uwufs_inode parent_dir_inode;
-	read_inode(device_fd, &parent_dir_inode, parent_dir_inode_num);
+	status = read_inode(device_fd, &parent_dir_inode, parent_dir_inode_num);
+	RETURN_IF_ERROR(status);
 
 	// find free inode for new child dir
 	uwufs_blk_t child_dir_inode_num;
-	find_free_inode(device_fd, &child_dir_inode_num);
+	status = find_free_inode(device_fd, &child_dir_inode_num);
+	RETURN_IF_ERROR(status);
 
 	// update the parent data blk
-	// TODO: assumes space in the first dir blk entry
-	// need new fn to find which dir blk to update/alloc new blk if needed
+	/* currently only populates first dir blk with entries
+	* TODO: replace with call to add_directory_file_entry() and debug */
 	struct uwufs_directory_data_blk parent_dir_blk;
 	uwufs_blk_t parent_dir_blk_num = parent_dir_inode.direct_blks[0];
-	read_blk(device_fd, &parent_dir_blk, parent_dir_blk_num);
+	status = read_blk(device_fd, &parent_dir_blk, parent_dir_blk_num);
+	RETURN_IF_ERROR(status);
+	
 	status = put_directory_file_entry(&parent_dir_blk, child_dir, 
 									  child_dir_inode_num);
-	if (status < 0)
-		return -ENOENT;
+	RETURN_IF_ERROR(status);
 
 	// write back parent data blk
 	status = write_blk(device_fd, &parent_dir_blk, UWUFS_BLOCK_SIZE,
 					   parent_dir_blk_num);
-	if (status < 0)
-		return -ENOENT;
+	RETURN_IF_ERROR(status);
 
 	// new child dir: populate . and .. entry
 	struct uwufs_directory_data_blk new_dir_blk;
 	memset(&new_dir_blk, 0, sizeof(new_dir_blk));
 	status = put_directory_file_entry(&new_dir_blk, ".", child_dir_inode_num);
-	if (status < 0)
-		return -ENOENT;
+	RETURN_IF_ERROR(status);
 	status = put_directory_file_entry(&new_dir_blk, "..", parent_dir_inode_num);
-	if (status < 0)
-		return -ENOENT;
+	RETURN_IF_ERROR(status);
 
 	// allocate a new data blk
 	uwufs_blk_t new_blk_num;
 	status = malloc_blk(device_fd, &new_blk_num);
 	if (status < 0 || new_blk_num <= 0)
-		return -ENOENT;
+		return status;
 
 	// Write entries to actual data block
 	status = write_blk(device_fd, &new_dir_blk, UWUFS_BLOCK_SIZE, new_blk_num);
-	if (status < 0)
-		return -ENOENT;
+	RETURN_IF_ERROR(status);
 
 	// TODO: add other permissions, metadata, etc
 	struct uwufs_inode new_inode;
@@ -186,9 +186,8 @@ int uwufs_mkdir(const char *path,
 	// write new dir inode
 	status = write_inode(device_fd, &new_inode, sizeof(new_inode),
 						 child_dir_inode_num);
-	if (status < 0)
-		return -ENOENT;
-
+	RETURN_IF_ERROR(status);
+	
 	return 0;
 }
 
@@ -254,13 +253,8 @@ int uwufs_readdir(const char *path,
 	(void) fi;
 	(void) flags;
 
-	// TODO: Use namei to search for the corresponding dir inode
-	// TEMP: Hard coding for root directory only for now
-	if (strcmp(path, "/") != 0)
-		return -ENOENT; // TEMP:
-
-	// uwufs_blk_t inode_num = namei(path);
-	uwufs_blk_t inode_num = UWUFS_ROOT_DIR_INODE;
+	uwufs_blk_t inode_num;
+	namei(device_fd, path, NULL, &inode_num);
 
 	struct uwufs_inode inode;
 	int status = read_inode(device_fd, &inode, inode_num);

@@ -108,4 +108,8 @@ struct __attribute__((__packed__)) uwufs_free_data_blk {
 	char padding[UWUFS_BLOCK_SIZE - sizeof(uwufs_blk_t)];
 };
 
+#define RETURN_IF_ERROR(status) \
+    if (status < 0)              \
+        return status;
+
 #endif
