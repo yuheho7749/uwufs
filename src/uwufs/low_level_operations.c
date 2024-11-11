@@ -33,7 +33,6 @@ debug_msg_ret:
 
 ssize_t write_blk(int fd,
 				  const void* buf,
-				  size_t size,
 				  uwufs_blk_t blk_num)
 {
 	ssize_t status = lseek(fd, blk_num * UWUFS_BLOCK_SIZE, SEEK_SET);
@@ -102,7 +101,7 @@ ssize_t write_inode(int fd,
 
 	memcpy(&inode_blk.inodes[inode_num_in_blk], buf, size);
 
-	status = write_blk(fd, &inode_blk, UWUFS_BLOCK_SIZE, inode_blk_num);
+	status = write_blk(fd, &inode_blk, inode_blk_num);
 	if (status < 0)
 		goto debug_msg_ret;
 
@@ -137,7 +136,7 @@ ssize_t malloc_blk(int fd, uwufs_blk_t *blk_num)
 		goto debug_msg_ret;
 
 	super_blk.freelist_head = free_blk.next_free_blk;
-	status = write_blk(fd, &super_blk, UWUFS_BLOCK_SIZE, 0);
+	status = write_blk(fd, &super_blk, 0);
 	if (status < 0)
 		goto debug_msg_ret;
 
@@ -163,11 +162,11 @@ ssize_t free_blk(int fd, const uwufs_blk_t blk_num)
 	new_freelist_head.next_free_blk = super_blk.freelist_head;
 	super_blk.freelist_head = blk_num;
 
-	status = write_blk(fd, &new_freelist_head, UWUFS_BLOCK_SIZE, blk_num);
+	status = write_blk(fd, &new_freelist_head, blk_num);
 	if (status < 0)
 		goto debug_msg_ret;
 
-	status = write_blk(fd, &super_blk, UWUFS_BLOCK_SIZE, 0);
+	status = write_blk(fd, &super_blk, 0);
 	if (status < 0)
 		goto debug_msg_ret;
 
@@ -213,7 +212,7 @@ ssize_t find_free_inode(int fd, uwufs_blk_t *inode_num) {
 					sizeof(struct uwufs_inode));
 
             // found a free inode
-            if ((inode.access_flags & F_TYPE_BITS) == F_TYPE_FREE) {
+            if ((inode.file_mode & F_TYPE_BITS) == F_TYPE_FREE) {
         
                 // calculate inode number and return
                 uwufs_blk_t num = (current_inode_blk - super_blk.ilist_start)
@@ -311,7 +310,7 @@ ssize_t namei(int fd,
 		//printf("\tResolving path segment [%s]\n", path_segment);
 
 		// regular file
-		if ((current_inode.access_flags & F_TYPE_BITS) == F_TYPE_REGULAR) {
+		if ((current_inode.file_mode & F_TYPE_BITS) == F_TYPE_REGULAR) {
 			path_segment = __strtok_r(NULL, "/", &strtok_ptr);
 			
 			if (path_segment != NULL) 
@@ -319,7 +318,7 @@ ssize_t namei(int fd,
 			break;
 		}
 		// directory
-		else if ((current_inode.access_flags & F_TYPE_BITS) == F_TYPE_DIRECTORY) {
+		else if ((current_inode.file_mode & F_TYPE_BITS) == F_TYPE_DIRECTORY) {
 			status = next_inode_in_path(fd, path_segment, &current_inode,
 										&current_inode_number);
 		}

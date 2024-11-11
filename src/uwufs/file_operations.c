@@ -71,8 +71,7 @@ ssize_t add_directory_file_entry(int fd,
 			continue;
 
 		// not sure if want to keep write in this fn or move out of 
-		status = write_blk(fd, &dir_blk, sizeof(dir_blk), 
-						   dir_inode_num);
+		status = write_blk(fd, &dir_blk, dir_inode_num);
 		return 0;
 	}
 

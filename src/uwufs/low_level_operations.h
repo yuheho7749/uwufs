@@ -27,10 +27,9 @@ ssize_t read_blk(int fd, void* buf, uwufs_blk_t blk_num);
  *
  * `fd`: block device
  * `buf`: data to write to block device (must be exactly UWUFS_BLOCK_SIZE)
- * `size`: must be UWUFS_BLOCK_SIZE (might change if implementation changes)
  * `blk_num`: block number to write to
  */
-ssize_t write_blk(int fd, const void* buf, size_t size, uwufs_blk_t blk_num);
+ssize_t write_blk(int fd, const void* buf, uwufs_blk_t blk_num);
 
 /**
  * Reads an inode from the specified block device.

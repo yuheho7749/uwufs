@@ -48,7 +48,7 @@ int uwufs_getattr(const char *path,
 		return -ENOENT;
 
 	// TODO: Fill in other file types and flags (not implemented yet)
-	uwufs_aflags_t flags = inode.access_flags;
+	uint16_t flags = inode.file_mode;
 	switch (flags & F_TYPE_BITS) {
 		case F_TYPE_DIRECTORY:
 			stbuf->st_mode = S_IFDIR | (flags & F_PERM_BITS);
@@ -154,8 +154,7 @@ int uwufs_mkdir(const char *path,
 	RETURN_IF_ERROR(status);
 
 	// write back parent data blk
-	status = write_blk(device_fd, &parent_dir_blk, UWUFS_BLOCK_SIZE,
-					   parent_dir_blk_num);
+	status = write_blk(device_fd, &parent_dir_blk, parent_dir_blk_num);
 	RETURN_IF_ERROR(status);
 
 	// new child dir: populate . and .. entry
@@ -173,13 +172,13 @@ int uwufs_mkdir(const char *path,
 		return status;
 
 	// Write entries to actual data block
-	status = write_blk(device_fd, &new_dir_blk, UWUFS_BLOCK_SIZE, new_blk_num);
+	status = write_blk(device_fd, &new_dir_blk, new_blk_num);
 	RETURN_IF_ERROR(status);
 
 	// TODO: add other permissions, metadata, etc
 	struct uwufs_inode new_inode;
 	memset(&new_inode, 0, UWUFS_INODE_DEFAULT_SIZE);
-	new_inode.access_flags = F_TYPE_DIRECTORY | 0755;
+	new_inode.file_mode = F_TYPE_DIRECTORY | 0755;
 	new_inode.direct_blks[0] = new_blk_num;
 	new_inode.file_size = UWUFS_BLOCK_SIZE;
 
@@ -261,7 +260,7 @@ int uwufs_readdir(const char *path,
 	if (status < 0)
 		return -ENOENT;
 
-	uwufs_aflags_t aflags = inode.access_flags;
+	uint16_t aflags = inode.file_mode;
 	if (F_TYPE_DIRECTORY != (aflags & F_TYPE_BITS))
 		return -ENOTDIR;
 
