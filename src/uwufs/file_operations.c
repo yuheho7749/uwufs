@@ -1,7 +1,7 @@
 /**
  * Implements file operations for uwufs.
  *
- * Author: Joseph
+ * Authors: Joseph, Kay
  */
 
 #include "file_operations.h"
@@ -10,7 +10,6 @@
 
 #include <errno.h>
 #include <string.h>
-#include <cstdio>
 
 ssize_t create_file(uwufs_blk_t *inode, uint16_t mode)
 {
@@ -62,16 +61,21 @@ ssize_t add_directory_file_entry(int fd,
 				return -ENOSPC;
 
 			dir_inode.direct_blks[i] = dir_blk_num;
+			dir_inode.file_size += UWUFS_BLOCK_SIZE;
 			write_inode(fd, &dir_inode, sizeof(dir_inode), dir_inode_num);
+
+			memset(&dir_blk, 0, sizeof(dir_blk));
+		}
+		else {
+			read_blk(fd, &dir_blk, dir_blk_num);
 		}
 
-		read_blk(fd, &dir_blk, dir_blk_num);
 		status = put_directory_file_entry(&dir_blk, name, file_inode_num);
 		if (status < 0) // no space, so go to next dir blk
 			continue;
 
 		// not sure if want to keep write in this fn or move out of 
-		status = write_blk(fd, &dir_blk, dir_inode_num);
+		status = write_blk(fd, &dir_blk, dir_blk_num);
 		return 0;
 	}
 

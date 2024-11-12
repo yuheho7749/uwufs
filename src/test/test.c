@@ -90,8 +90,15 @@ int main(int argc, char* argv[]) {
 		close(fd);
 		exit(1);
 	}
-	printf("Root Directory Entries (first block only):\n");
+
+	// ---- Check root dir blk numbers to make sure unused set to 0 ----
+	printf("Root Directory Direct Block Numbers (all blocks)\n");
 	int i;
+	for (i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
+		printf("Direct block %d: %lu\n", i, root_directory_inode.direct_blks[i]);
+	}
+
+	printf("Root Directory Entries (first block only):\n");
 	for (i = 0; i < 64; i ++) {
 		if (dir_data_blk.file_entries[i].inode_num <= 0) {
 			continue;

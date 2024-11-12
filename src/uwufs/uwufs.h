@@ -1,8 +1,8 @@
 /**
  * Define macros and common objects for uwufs.
  *
- * Author: Joseph
- * Collaborators: Kay, Kong, Jason
+ * Authors: Joseph, Kay
+ * Collaborators: Kong, Jason
  */
 
 #ifndef UWUFS_H

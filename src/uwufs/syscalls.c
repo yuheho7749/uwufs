@@ -1,7 +1,7 @@
 /**
  * Implement fuse syscall operations for uwufs
  *
- * Author: Joseph
+ * Authors: Joseph, Kay
  */
 
 #define FUSE_USE_VERSION 31
@@ -131,31 +131,14 @@ int uwufs_mkdir(const char *path,
 	if (status < 0)
 		return -ENOENT;
 
-	// read in the parent inode
-	struct uwufs_inode parent_dir_inode;
-	status = read_inode(device_fd, &parent_dir_inode, parent_dir_inode_num);
-	RETURN_IF_ERROR(status);
-
 	// find free inode for new child dir
 	uwufs_blk_t child_dir_inode_num;
 	status = find_free_inode(device_fd, &child_dir_inode_num);
 	RETURN_IF_ERROR(status);
 
-	// update the parent data blk
-	/* currently only populates first dir blk with entries
-	* TODO: replace with call to add_directory_file_entry() and debug */
-	struct uwufs_directory_data_blk parent_dir_blk;
-	uwufs_blk_t parent_dir_blk_num = parent_dir_inode.direct_blks[0];
-	status = read_blk(device_fd, &parent_dir_blk, parent_dir_blk_num);
-	RETURN_IF_ERROR(status);
-	
-	status = put_directory_file_entry(&parent_dir_blk, child_dir, 
-									  child_dir_inode_num);
-	RETURN_IF_ERROR(status);
-
-	// write back parent data blk
-	status = write_blk(device_fd, &parent_dir_blk, parent_dir_blk_num);
-	RETURN_IF_ERROR(status);
+	// update the parent data blk 
+	status = add_directory_file_entry(device_fd, parent_dir_inode_num,
+						child_dir, child_dir_inode_num);
 
 	// new child dir: populate . and .. entry
 	struct uwufs_directory_data_blk new_dir_blk;
