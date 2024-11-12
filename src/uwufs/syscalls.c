@@ -139,6 +139,7 @@ int uwufs_mkdir(const char *path,
 	// update the parent data blk 
 	status = add_directory_file_entry(device_fd, parent_dir_inode_num,
 						child_dir, child_dir_inode_num);
+	RETURN_IF_ERROR(status);
 
 	// new child dir: populate . and .. entry
 	struct uwufs_directory_data_blk new_dir_blk;
