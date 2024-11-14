@@ -22,7 +22,7 @@ ssize_t put_directory_file_entry(struct uwufs_directory_data_blk *dir_blk,
 								 uwufs_blk_t file_inode_num)
 {
 	struct uwufs_directory_file_entry file_entry;
-	int n = sizeof(file_entry);
+	int n = UWUFS_BLOCK_SIZE/sizeof(file_entry);
 	int i;
 	for (i = 0; i < n; i++) {
 		file_entry = dir_blk->file_entries[i];
