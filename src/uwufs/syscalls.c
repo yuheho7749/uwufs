@@ -38,12 +38,14 @@ int uwufs_getattr(const char *path,
 	(void) fi;
 
 	uwufs_blk_t inode_num;
-	namei(device_fd, path, NULL, &inode_num);
+	ssize_t status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
 
 	memset(stbuf, 0, sizeof(struct stat));
 
 	struct uwufs_inode inode;
-	int status = read_inode(device_fd, &inode, inode_num);
+	status = read_inode(device_fd, &inode, inode_num);
 	if (status < 0)
 		return -ENOENT;
 
@@ -113,12 +115,15 @@ int uwufs_mkdir(const char *path,
 	
 	ssize_t status;
 
+	// printf("original path %s", path);
 	// split path into parent + child parts
 	char parent_path[strlen(path)];
 	char child_dir[UWUFS_FILE_NAME_SIZE];
 	status = split_path_parent_child(path, parent_path, child_dir);
 	if (status < 0)
 		return -ENOENT;
+	// printf("parent_path %s", parent_path);
+	// printf("child_dir %s", child_dir);
 
 	// read root inode for namei
 	struct uwufs_inode root_inode;
@@ -237,10 +242,12 @@ int uwufs_readdir(const char *path,
 	(void) flags;
 
 	uwufs_blk_t inode_num;
-	namei(device_fd, path, NULL, &inode_num);
+	ssize_t status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
 
 	struct uwufs_inode inode;
-	int status = read_inode(device_fd, &inode, inode_num);
+	status = read_inode(device_fd, &inode, inode_num);
 	if (status < 0)
 		return -ENOENT;
 

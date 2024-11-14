@@ -11,9 +11,11 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <assert.h>
 
 ssize_t read_blk(int fd, void* buf, uwufs_blk_t blk_num)
 {
+	// assert(blk_num < 20000000);
 	ssize_t status = lseek(fd, blk_num * UWUFS_BLOCK_SIZE, SEEK_SET);
 	if (status < 0)
 		goto debug_msg_ret;
@@ -59,7 +61,7 @@ ssize_t read_inode(int fd, void* buf, uwufs_blk_t inode_num)
 	uwufs_blk_t inode_blk_num = 1 + UWUFS_RESERVED_SPACE; // TEMP: Hard coded
 	inode_blk_num += (inode_num * sizeof(struct uwufs_inode))
 					  / UWUFS_BLOCK_SIZE;
-	
+	printf("read_inode: inode_blk_num %lu\n", inode_blk_num);
 	uwufs_blk_t inode_num_in_blk;
 	struct uwufs_inode_blk inode_blk;
 	ssize_t status = read_blk(fd, &inode_blk, inode_blk_num);
@@ -261,10 +263,10 @@ ssize_t next_inode_in_path(int fd,
 			}
 			if (strcmp(dir_data_blk.file_entries[j].file_name, file_name) == 0) {
 					*inode_num = dir_data_blk.file_entries[j].inode_num;
-#ifdef DEBUG
-					printf("\t\tResolved %s with inode number %lu\n", file_name, 
-						dir_data_blk.file_entries[j].inode_num);
-#endif
+// #ifdef DEBUG
+// 					printf("\t\tResolved %s with inode number %lu\n", file_name, 
+// 						dir_data_blk.file_entries[j].inode_num);
+// #endif
 					return 0;	
 			}
 		}
