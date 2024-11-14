@@ -70,7 +70,9 @@ int uwufs_mknod(const char *path, mode_t mode, dev_t device) {
 	return -ENOENT;
 }
 
-ssize_t split_path_parent_child(const char *path, char *parent_path, char *child_dir) {
+ssize_t split_path_parent_child(const char *path,
+								char *parent_path,
+								char *child_dir) {
     char path_copy[strlen(path)];
 	strcpy(path_copy, path);
 	char *last_dir = strrchr(path_copy, '/');
@@ -110,9 +112,9 @@ ssize_t split_path_parent_child(const char *path, char *parent_path, char *child
 int uwufs_mkdir(const char *path,
 				mode_t mode)
 {
-	// TEMP: don't care if it's not a dir
-	if (!(mode | S_IFDIR))
-		return -ENOTDIR;
+	// // TEMP: don't care if it's not a dir
+	// if (!S_ISDIR(mode))
+	// 	return -ENOTDIR;
 	
 	ssize_t status;
 
@@ -165,7 +167,7 @@ int uwufs_mkdir(const char *path,
 	// TODO: add other permissions, metadata, etc
 	struct uwufs_inode new_inode;
 	memset(&new_inode, 0, UWUFS_INODE_DEFAULT_SIZE);
-	new_inode.file_mode = F_TYPE_DIRECTORY | 0755;
+	new_inode.file_mode = F_TYPE_DIRECTORY | 0755; // NOTE: Use mode?
 	new_inode.direct_blks[0] = new_blk_num;
 	new_inode.file_size = UWUFS_BLOCK_SIZE;
 
@@ -283,30 +285,77 @@ int uwufs_readdir(const char *path,
 	return 0;
 }
 
-// TODO:
+
+int __create_regular_file(const char *path,
+						  mode_t mode,
+						  struct fuse_file_info *fi)
+{
+	(void) fi; // TEMP: Don't care for now
+
+	uwufs_blk_t inode_num;
+	ssize_t file_exists_status = namei(device_fd, path, NULL, &inode_num);
+
+	char parent_path[strlen(path)];
+	char child_path[UWUFS_FILE_NAME_SIZE];
+
+	uwufs_blk_t parent_dir_inode_num;
+
+	uwufs_blk_t child_file_inode_num;
+	struct uwufs_inode child_file_inode;
+
+	ssize_t status;
+	if (file_exists_status == -ENOENT) { // Create new file here
+#ifdef DEBUG
+		printf("create_regular_file: creating new file");
+#endif
+		status = split_path_parent_child(path, parent_path, child_path);
+		if (status < 0)
+			return -ENOENT;
+
+		// Find parent inode
+		status = namei(device_fd, parent_path, NULL, &parent_dir_inode_num);
+		if (status < 0)
+			return -ENOENT;
+
+		// Get new empty inode
+		child_file_inode_num = find_free_inode(device_fd, &child_file_inode_num);
+		RETURN_IF_ERROR(status);
+
+		// Add child file entry to parent dir
+		status = add_directory_file_entry(device_fd, parent_dir_inode_num,
+						   child_path, child_file_inode_num);
+		RETURN_IF_ERROR(status);
+
+		// Init child file inode
+		memset(&child_file_inode, 0, sizeof(struct uwufs_inode));
+		// TODO: Other file perms
+		child_file_inode.file_mode = F_TYPE_REGULAR | (mode & F_PERM_BITS);
+		child_file_inode.file_size = 0;
+
+		status = write_inode(device_fd, &child_file_inode,
+					   sizeof(child_file_inode), child_file_inode_num);
+		RETURN_IF_ERROR(status);
+
+		return status;
+	} else if (file_exists_status < 0) {
+		return file_exists_status;
+	}
+#ifdef DEBUG
+	printf("create_regular_file: file already exists");
+#endif
+	return 0; // Ok if file exists already
+}
+
 int uwufs_create(const char *path,
 				 mode_t mode,
 				 struct fuse_file_info *fi)
 {
-	(void) fi; // TEMP: Don't care for now
-	uwufs_blk_t inode_num;
-	ssize_t status = namei(device_fd, path, NULL, &inode_num);
-	if (status == -ENOENT) {
-		switch (mode) {
-			case S_IFREG:
-
-				break;
-			case S_IFDIR:
-
-				break;
-			case S_IFLNK:
-
-				break;
-			default:
-				return -EINVAL;
-		}
-	}
-	return -ENOENT;
+#ifdef DEBUG
+	printf("uwufs_create: %s", path);
+#endif
+	if (S_ISREG(mode))
+		return  __create_regular_file(path, mode, fi);
+	return -EINVAL;
 }
 
 // TODO:
@@ -314,5 +363,6 @@ int uwufs_utimens(const char *path,
 				  const struct timespec tv[2],
 				  struct fuse_file_info *fi)
 {
-	return -ENOENT;
+	return 0; // TEMP:
+	// return -ENOENT;
 }
