@@ -246,7 +246,7 @@ ssize_t next_inode_in_path(int fd,
 
 	struct uwufs_directory_data_blk dir_data_blk;
 	ssize_t status;
-	int num_entries = UWUFS_BLOCK_SIZE / (UWUFS_FILE_NAME_SIZE + sizeof(uwufs_blk_t));
+	int num_entries = UWUFS_BLOCK_SIZE / sizeof(struct uwufs_directory_file_entry);
 
 	// scan each direct block 
 	for (int i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
@@ -305,11 +305,11 @@ ssize_t namei(int fd,
 	char* strtok_ptr;
 	char *path_segment;
 
-	path_segment = __strtok_r(full_path, "/", &strtok_ptr);
+	path_segment = strtok_r(full_path, "/", &strtok_ptr);
 	while (path_segment != NULL) {
 		// regular file
 		if ((current_inode.file_mode & F_TYPE_BITS) == F_TYPE_REGULAR) {
-			path_segment = __strtok_r(NULL, "/", &strtok_ptr);
+			path_segment = strtok_r(NULL, "/", &strtok_ptr);
 			
 			if (path_segment != NULL) 
 				return -ENOENT; // regular file found but not at leaf of path
@@ -321,6 +321,7 @@ ssize_t namei(int fd,
 										&current_inode_number);
 		}
 		// symlink
+		// NOTE: Use readlink syscall later
 		else {
 			struct uwufs_regular_file_data_blk symlink_data;
 			// assumes symlink contents stored in first direct blk
@@ -341,7 +342,7 @@ ssize_t namei(int fd,
 		status = read_inode(fd, &current_inode, current_inode_number);
 		if (status < 0) 
 			goto debug_msg_ret;
-		path_segment = __strtok_r(NULL, "/", &strtok_ptr);
+		path_segment = strtok_r(NULL, "/", &strtok_ptr);
 	}
 
 	*inode_num = current_inode_number;

@@ -75,8 +75,7 @@ ssize_t malloc_blk(int fd, uwufs_blk_t *blk_num);
 ssize_t free_blk(int fd, const uwufs_blk_t blk_num);
 
 /**
- * TODO: Not implemented yet
- * Finds a free inode and returns it's inode number in the `inode_num`
+ * Finds a free inode and returns its inode number in the `inode_num`
  * 		output variable
  *
  * `fd`: block device
