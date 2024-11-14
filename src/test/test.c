@@ -99,7 +99,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	printf("Root Directory Entries (first block only):\n");
-	for (i = 0; i < 64; i ++) {
+	for (i = 0; i < UWUFS_BLOCK_SIZE/sizeof(struct uwufs_directory_file_entry); i ++) {
 		if (dir_data_blk.file_entries[i].inode_num <= 0) {
 			continue;
 		}
