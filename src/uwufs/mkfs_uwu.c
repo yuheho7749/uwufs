@@ -184,6 +184,7 @@ static void init_inodes2(int fd,
 static void init_root_directory(int fd)
 {
 	struct uwufs_inode root_inode;
+	memset(&root_inode, 0, sizeof(root_inode));
 	ssize_t status;
 
 	// TODO: Abstract this to add_directory_file_entry (which is

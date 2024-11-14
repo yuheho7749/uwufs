@@ -37,13 +37,14 @@ ssize_t put_directory_file_entry(struct uwufs_directory_data_blk *dir_blk,
 								 uwufs_blk_t file_inode_num);
 
 /**
- * TODO:
  * Adds a file entry to the specified directory. This function
  * will automatically allocate additional data blocks if needed.
  *
  * Return: 0 on success or -ENOSPC if the directory is full/no more
  * 		space on storage device (no more blocks can be allocated)
  *
+ * TODO: Indirect blks; currently only checks/allocates direct blks
+ * 
  * Parameters:
  * `fd`: block device
  * `dir_inode_num`: a valid data block number

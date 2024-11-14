@@ -1,7 +1,7 @@
 /**
  * Provide low level block operations
  *
- * Author: Joseph
+ * Authors: Joseph, Kay
  */
 
 #ifndef LOW_LEVEL_OPERATIONS_H

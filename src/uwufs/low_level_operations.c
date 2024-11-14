@@ -1,5 +1,5 @@
 /**
- * Author: Joseph
+ * Authors: Joseph, Kay
  */
 
 #include "low_level_operations.h"
@@ -307,8 +307,6 @@ ssize_t namei(int fd,
 
 	path_segment = strtok_r(full_path, "/", &strtok_ptr);
 	while (path_segment != NULL) {
-		//printf("\tResolving path segment [%s]\n", path_segment);
-
 		// regular file
 		if ((current_inode.file_mode & F_TYPE_BITS) == F_TYPE_REGULAR) {
 			path_segment = strtok_r(NULL, "/", &strtok_ptr);
