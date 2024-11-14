@@ -66,6 +66,9 @@ int uwufs_getattr(const char *path,
 	return -ENOENT;
 }
 
+int uwufs_mknod(const char *path, mode_t mode, dev_t device) {
+	return -ENOENT;
+}
 
 ssize_t split_path_parent_child(const char *path, char *parent_path, char *child_dir) {
     char path_copy[strlen(path)];
@@ -285,6 +288,24 @@ int uwufs_create(const char *path,
 				 mode_t mode,
 				 struct fuse_file_info *fi)
 {
+	(void) fi; // TEMP: Don't care for now
+	uwufs_blk_t inode_num;
+	ssize_t status = namei(device_fd, path, NULL, &inode_num);
+	if (status == -ENOENT) {
+		switch (mode) {
+			case S_IFREG:
+
+				break;
+			case S_IFDIR:
+
+				break;
+			case S_IFLNK:
+
+				break;
+			default:
+				return -EINVAL;
+		}
+	}
 	return -ENOENT;
 }
 
