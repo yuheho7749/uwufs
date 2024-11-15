@@ -309,7 +309,7 @@ int __create_regular_file(const char *path,
 	ssize_t status;
 	if (file_exists_status == -ENOENT) { // Create new file here
 #ifdef DEBUG
-		printf("create_regular_file: creating new file");
+		printf("__create_regular_file: creating new file\n");
 #endif
 		status = split_path_parent_child(path, parent_path, child_path);
 		if (status < 0)
@@ -321,7 +321,7 @@ int __create_regular_file(const char *path,
 			return -ENOENT;
 
 		// Get new empty inode
-		child_file_inode_num = find_free_inode(device_fd, &child_file_inode_num);
+		status = find_free_inode(device_fd, &child_file_inode_num);
 		RETURN_IF_ERROR(status);
 
 		// Add child file entry to parent dir
@@ -337,9 +337,10 @@ int __create_regular_file(const char *path,
 
 		status = write_inode(device_fd, &child_file_inode,
 					   sizeof(child_file_inode), child_file_inode_num);
-		RETURN_IF_ERROR(status);
+		if (status < 0)
+			return -EIO;
 
-		return status;
+		return 0;
 	} else if (file_exists_status < 0) {
 		return file_exists_status;
 	}
@@ -354,7 +355,7 @@ int uwufs_create(const char *path,
 				 struct fuse_file_info *fi)
 {
 #ifdef DEBUG
-	printf("uwufs_create: %s", path);
+	printf("uwufs_create: %s\n", path);
 #endif
 	if (S_ISREG(mode))
 		return  __create_regular_file(path, mode, fi);
@@ -366,6 +367,6 @@ int uwufs_utimens(const char *path,
 				  const struct timespec tv[2],
 				  struct fuse_file_info *fi)
 {
-	return 0; // TEMP:
+	return 0; // TODO:
 	// return -ENOENT;
 }

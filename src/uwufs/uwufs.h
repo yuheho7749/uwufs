@@ -25,8 +25,8 @@
 #define UWUFS_ROOT_DIR_INODE 			2
 #define UWUFS_RESERVED_SPACE			1
 
-// Total file entry in a directory is 64 bytes
-#define UWUFS_FILE_NAME_SIZE			56
+// Total file entry in a directory is 256 bytes
+#define UWUFS_FILE_NAME_SIZE			248
 
 /* File access mode */
 typedef uint16_t uwufs_aflags_t; // Deprecated (use uint16_t directly)
@@ -93,7 +93,7 @@ struct __attribute__((__packed__)) uwufs_directory_file_entry {
 };
 
 struct __attribute__((__packed__)) uwufs_directory_data_blk {
-	// 64 entries (assuming 4096 byte block size and 64 bytes per entry)
+	// 16 entries (assuming 4096 byte block size and 256 bytes per entry)
 	struct uwufs_directory_file_entry file_entries[
 		UWUFS_BLOCK_SIZE/sizeof(struct uwufs_directory_file_entry)];
 };
