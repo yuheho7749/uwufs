@@ -30,6 +30,7 @@ ssize_t put_directory_file_entry(struct uwufs_directory_data_blk *dir_blk,
 			dir_blk->file_entries[i].inode_num = file_inode_num;
 			memcpy(dir_blk->file_entries[i].file_name, name,
 				   UWUFS_FILE_NAME_SIZE);
+			dir_blk->file_entries[i].file_name[UWUFS_FILE_NAME_SIZE-1] = '\0';
 			return 0;
 		}
 	}

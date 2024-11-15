@@ -75,7 +75,7 @@ int uwufs_mknod(const char *path, mode_t mode, dev_t device) {
 ssize_t split_path_parent_child(const char *path,
 								char *parent_path,
 								char *child_dir) {
-    char path_copy[strlen(path)];
+    char path_copy[strlen(path)+1];
 	strcpy(path_copy, path);
 	char *last_dir = strrchr(path_copy, '/');
     
@@ -85,12 +85,12 @@ ssize_t split_path_parent_child(const char *path,
         parent_path[length] = '\0';
 
 		size_t child_dir_length = strlen(last_dir+1); // start after '/'
-		if (child_dir_length > UWUFS_FILE_NAME_SIZE) {
+		if (child_dir_length >= UWUFS_FILE_NAME_SIZE) {
 			strncpy(child_dir, last_dir+1, UWUFS_FILE_NAME_SIZE);
+			child_dir[UWUFS_FILE_NAME_SIZE-1] = '\0';
+			return -ENAMETOOLONG;
 		}
-		else {
-			strncpy(child_dir, last_dir+1, child_dir_length);
-		}
+		strncpy(child_dir, last_dir+1, child_dir_length);
 		child_dir[child_dir_length] = '\0';
 		return 0;
     } else {
@@ -99,7 +99,7 @@ ssize_t split_path_parent_child(const char *path,
 #ifdef DEBUG
 		printf("Error with split_path_parent_child() function\n");
 #endif	
-		return -1;
+		return -ENOENT;
     }
 }
 
@@ -118,11 +118,11 @@ int uwufs_mkdir(const char *path,
 
 	// printf("original path %s", path);
 	// split path into parent + child parts
-	char parent_path[strlen(path)];
+	char parent_path[strlen(path)+1];
 	char child_dir[UWUFS_FILE_NAME_SIZE];
 	status = split_path_parent_child(path, parent_path, child_dir);
 	if (status < 0)
-		return -ENOENT;
+		return status;
 	// printf("parent_path %s", parent_path);
 	// printf("child_dir %s", child_dir);
 
@@ -296,9 +296,9 @@ int __create_regular_file(const char *path,
 	(void) fi; // TEMP: Don't care for now
 
 	uwufs_blk_t inode_num;
-	ssize_t file_exists_status = namei(device_fd, path, NULL, &inode_num);
+	ssize_t file_exists_status;
 
-	char parent_path[strlen(path)];
+	char parent_path[strlen(path)+1];
 	char child_path[UWUFS_FILE_NAME_SIZE];
 
 	uwufs_blk_t parent_dir_inode_num;
@@ -307,14 +307,15 @@ int __create_regular_file(const char *path,
 	struct uwufs_inode child_file_inode;
 
 	ssize_t status;
+	status = split_path_parent_child(path, parent_path, child_path);
+	if (status < 0)
+		return status;
+
+	file_exists_status = namei(device_fd, path, NULL, &inode_num);
 	if (file_exists_status == -ENOENT) { // Create new file here
 #ifdef DEBUG
 		printf("__create_regular_file: creating new file\n");
 #endif
-		status = split_path_parent_child(path, parent_path, child_path);
-		if (status < 0)
-			return -ENOENT;
-
 		// Find parent inode
 		status = namei(device_fd, parent_path, NULL, &parent_dir_inode_num);
 		if (status < 0)
