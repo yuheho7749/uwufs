@@ -17,7 +17,7 @@ ssize_t read_blk(int fd, void* buf, uwufs_blk_t blk_num)
 	ssize_t status = lseek(fd, blk_num * UWUFS_BLOCK_SIZE, SEEK_SET);
 	if (status < 0)
 		goto debug_msg_ret;
-	
+
 	status = read(fd, buf, UWUFS_BLOCK_SIZE);
 	if (status < 0)
 		goto debug_msg_ret;
@@ -59,7 +59,7 @@ ssize_t read_inode(int fd, void* buf, uwufs_blk_t inode_num)
 	uwufs_blk_t inode_blk_num = 1 + UWUFS_RESERVED_SPACE; // TEMP: Hard coded
 	inode_blk_num += (inode_num * sizeof(struct uwufs_inode))
 					  / UWUFS_BLOCK_SIZE;
-	
+
 	uwufs_blk_t inode_num_in_blk;
 	struct uwufs_inode_blk inode_blk;
 	ssize_t status = read_blk(fd, &inode_blk, inode_blk_num);
@@ -250,6 +250,11 @@ ssize_t next_inode_in_path(int fd,
 
 	// scan each direct block 
 	for (int i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
+		// TEMP: Should actually check that the direct blks point to
+		// 		blks after ilist (but that requires info from super blk
+		if (cur_inode->direct_blks[i] <= 1 + UWUFS_RESERVED_SPACE) {
+			continue;
+		}
 		status = read_blk(fd, &dir_data_blk, cur_inode->direct_blks[i]);
 		if (status < 0) 
 			goto debug_msg_ret;
@@ -259,16 +264,18 @@ ssize_t next_inode_in_path(int fd,
 			if (dir_data_blk.file_entries[j].inode_num <= 0) {
 				continue;
 			}
-			if (strcmp(dir_data_blk.file_entries[j].file_name, file_name) == 0) {
-					*inode_num = dir_data_blk.file_entries[j].inode_num;
+			if (strlen(file_name) > 0 &&
+				strcmp(dir_data_blk.file_entries[j].file_name, file_name) == 0) {
+				*inode_num = dir_data_blk.file_entries[j].inode_num;
 #ifdef DEBUG
-					printf("\t\tResolved %s with inode number %lu\n", file_name, 
-						dir_data_blk.file_entries[j].inode_num);
+				// printf("\t\tResolved %s with inode number %lu\n", file_name,
+				// 	dir_data_blk.file_entries[j].inode_num);
 #endif
-					return 0;	
+				return 0;
 			}
 		}
 	}
+
 	return -ENOENT; //not found
 
 debug_msg_ret:
@@ -307,6 +314,7 @@ ssize_t namei(int fd,
 
 	path_segment = strtok_r(full_path, "/", &strtok_ptr);
 	while (path_segment != NULL) {
+		status = 0;
 		// regular file
 		if ((current_inode.file_mode & F_TYPE_BITS) == F_TYPE_REGULAR) {
 			path_segment = strtok_r(NULL, "/", &strtok_ptr);
@@ -319,9 +327,12 @@ ssize_t namei(int fd,
 		else if ((current_inode.file_mode & F_TYPE_BITS) == F_TYPE_DIRECTORY) {
 			status = next_inode_in_path(fd, path_segment, &current_inode,
 										&current_inode_number);
+			if (status == -ENOENT) // File does not exist
+				return status;
 		}
 		// symlink
 		// NOTE: Use readlink syscall later
+		// Also need to handle other file types in the future
 		else {
 			struct uwufs_regular_file_data_blk symlink_data;
 			// assumes symlink contents stored in first direct blk
@@ -340,7 +351,7 @@ ssize_t namei(int fd,
 		if (status < 0 || current_inode_number == 0)
 			goto debug_msg_ret;
 		status = read_inode(fd, &current_inode, current_inode_number);
-		if (status < 0) 
+		if (status < 0)
 			goto debug_msg_ret;
 		path_segment = strtok_r(NULL, "/", &strtok_ptr);
 	}
@@ -354,4 +365,3 @@ debug_msg_ret:
 #endif
 	return status;
 }
-
