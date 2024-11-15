@@ -10,6 +10,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <assert.h>
 
 ssize_t create_file(uwufs_blk_t *inode, uint16_t mode)
 {
