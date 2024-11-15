@@ -38,12 +38,14 @@ int uwufs_getattr(const char *path,
 	(void) fi;
 
 	uwufs_blk_t inode_num;
-	namei(device_fd, path, NULL, &inode_num);
+	ssize_t status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
 
 	memset(stbuf, 0, sizeof(struct stat));
 
 	struct uwufs_inode inode;
-	int status = read_inode(device_fd, &inode, inode_num);
+	status = read_inode(device_fd, &inode, inode_num);
 	if (status < 0)
 		return -ENOENT;
 
@@ -107,18 +109,17 @@ ssize_t split_path_parent_child(const char *path, char *parent_path, char *child
 int uwufs_mkdir(const char *path,
 				mode_t mode)
 {
-	// TEMP: don't care if it's not a dir
-	if (!(mode | S_IFDIR))
-		return -ENOTDIR;
-	
 	ssize_t status;
 
+	// printf("original path %s", path);
 	// split path into parent + child parts
 	char parent_path[strlen(path)];
 	char child_dir[UWUFS_FILE_NAME_SIZE];
 	status = split_path_parent_child(path, parent_path, child_dir);
 	if (status < 0)
 		return -ENOENT;
+	// printf("parent_path %s", parent_path);
+	// printf("child_dir %s", child_dir);
 
 	// read root inode for namei
 	struct uwufs_inode root_inode;
@@ -162,7 +163,7 @@ int uwufs_mkdir(const char *path,
 	// TODO: add other permissions, metadata, etc
 	struct uwufs_inode new_inode;
 	memset(&new_inode, 0, UWUFS_INODE_DEFAULT_SIZE);
-	new_inode.file_mode = F_TYPE_DIRECTORY | 0755;
+	new_inode.file_mode = F_TYPE_DIRECTORY | (F_PERM_BITS & mode);
 	new_inode.direct_blks[0] = new_blk_num;
 	new_inode.file_size = UWUFS_BLOCK_SIZE;
 
@@ -237,10 +238,12 @@ int uwufs_readdir(const char *path,
 	(void) flags;
 
 	uwufs_blk_t inode_num;
-	namei(device_fd, path, NULL, &inode_num);
+	ssize_t status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
 
 	struct uwufs_inode inode;
-	int status = read_inode(device_fd, &inode, inode_num);
+	status = read_inode(device_fd, &inode, inode_num);
 	if (status < 0)
 		return -ENOENT;
 
