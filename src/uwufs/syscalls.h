@@ -24,9 +24,18 @@ void* uwufs_init(struct fuse_conn_info *conn, struct fuse_config *cfg);
 int uwufs_getattr(const char *path, struct stat *stbuf,
 				  struct fuse_file_info *fi);
 
+// NOTE: Might be uneeded because of uwufs_create
 int uwufs_mknod(const char *path, mode_t mode, dev_t device);
 
 int uwufs_mkdir(const char *path, mode_t mode);
+
+/**
+ * Decrements the hard link counter to a file. If the counter
+ * 		becomes 0, delete the actual file.
+ */
+int uwufs_unlink(const char *path);
+
+int uwufs_rmdir(const char *path);
 
 int uwufs_open(const char *path, struct fuse_file_info *fi);
 

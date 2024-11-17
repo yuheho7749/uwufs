@@ -81,6 +81,9 @@ int main(int argc, char* argv[]) {
 	printf("\tFile type: %d\n", (f_mode & F_TYPE_BITS) >> 12);
 	printf("\tFile perm: %o\n", f_mode & F_PERM_BITS);
 	printf("\tDir size (raw): %lu\n", dir_size);
+	printf("\tDir links: %d\n", root_directory_inode.file_links_count);
+	printf("\tDir uid: %d\n", root_directory_inode.file_uid);
+	printf("\tDir gid: %d\n", root_directory_inode.file_gid);
 
 	// ----- Read freelist head using super blk info -----
 	struct uwufs_directory_data_blk dir_data_blk;

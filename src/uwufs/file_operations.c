@@ -43,7 +43,8 @@ ssize_t put_directory_file_entry(struct uwufs_directory_data_blk *dir_blk,
 ssize_t add_directory_file_entry(int fd,
 								 const uwufs_blk_t dir_inode_num,
 								 const char name[UWUFS_FILE_NAME_SIZE],
-								 uwufs_blk_t file_inode_num)
+								 uwufs_blk_t file_inode_num,
+								 int nlinks_change)
 {
 	ssize_t status;
 
@@ -63,7 +64,6 @@ ssize_t add_directory_file_entry(int fd,
 
 			dir_inode.direct_blks[i] = dir_blk_num;
 			dir_inode.file_size += UWUFS_BLOCK_SIZE;
-			write_inode(fd, &dir_inode, sizeof(dir_inode), dir_inode_num);
 
 			memset(&dir_blk, 0, sizeof(dir_blk));
 		}
@@ -74,6 +74,10 @@ ssize_t add_directory_file_entry(int fd,
 		status = put_directory_file_entry(&dir_blk, name, file_inode_num);
 		if (status < 0) // no space, so go to next dir blk
 			continue;
+
+		// increase nlinks (if added new dir)
+		dir_inode.file_links_count += nlinks_change;
+		write_inode(fd, &dir_inode, sizeof(dir_inode), dir_inode_num);
 
 		// not sure if want to keep write in this fn or move out of 
 		status = write_blk(fd, &dir_blk, dir_blk_num);

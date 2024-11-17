@@ -217,6 +217,7 @@ static void init_root_directory(int fd)
 	root_inode.file_mode = F_TYPE_DIRECTORY | 0755;
 	root_inode.direct_blks[0] = blk_num;
 	root_inode.file_size = UWUFS_BLOCK_SIZE;
+	root_inode.file_links_count = 2; // Account for "." refer to itself
 
 	// Write to root inode
 	status = write_inode(fd, &root_inode, sizeof(root_inode),
