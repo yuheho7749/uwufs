@@ -1,6 +1,6 @@
 VERSION = 0
 SUBVERSION = 2
-PATCH = 14
+PATCH = 15
 EXTRAVERSION = -a
 
 DEBUG = 0
@@ -18,7 +18,7 @@ BUILD_DIR = build
 
 COMMON_FILES = $(SRC_DIR)/uwufs/uwufs.h $(SRC_DIR)/uwufs/low_level_operations.h $(SRC_DIR)/uwufs/low_level_operations.c $(SRC_DIR)/uwufs/file_operations.h $(SRC_DIR)/uwufs/file_operations.c
 
-all: $(BUILD_DIR) phase1 mkfs.uwu mount.uwu
+all: $(BUILD_DIR) phase1 mkfs.uwu mount.uwu test
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
