@@ -68,9 +68,14 @@ int uwufs_getattr(const char *path,
 	return -ENOENT;
 }
 
+int uwufs_mknod(const char *path, mode_t mode, dev_t device) {
+	return -ENOENT;
+}
 
-ssize_t split_path_parent_child(const char *path, char *parent_path, char *child_dir) {
-    char path_copy[strlen(path)];
+ssize_t split_path_parent_child(const char *path,
+								char *parent_path,
+								char *child_dir) {
+    char path_copy[strlen(path)+1];
 	strcpy(path_copy, path);
 	char *last_dir = strrchr(path_copy, '/');
     
@@ -80,12 +85,12 @@ ssize_t split_path_parent_child(const char *path, char *parent_path, char *child
         parent_path[length] = '\0';
 
 		size_t child_dir_length = strlen(last_dir+1); // start after '/'
-		if (child_dir_length > UWUFS_FILE_NAME_SIZE) {
+		if (child_dir_length >= UWUFS_FILE_NAME_SIZE) {
 			strncpy(child_dir, last_dir+1, UWUFS_FILE_NAME_SIZE);
+			child_dir[UWUFS_FILE_NAME_SIZE-1] = '\0';
+			return -ENAMETOOLONG;
 		}
-		else {
-			strncpy(child_dir, last_dir+1, child_dir_length);
-		}
+		strncpy(child_dir, last_dir+1, child_dir_length);
 		child_dir[child_dir_length] = '\0';
 		return 0;
     } else {
@@ -94,7 +99,7 @@ ssize_t split_path_parent_child(const char *path, char *parent_path, char *child
 #ifdef DEBUG
 		printf("Error with split_path_parent_child() function\n");
 #endif	
-		return -1;
+		return -ENOENT;
     }
 }
 
@@ -113,11 +118,11 @@ int uwufs_mkdir(const char *path,
 
 	// printf("original path %s", path);
 	// split path into parent + child parts
-	char parent_path[strlen(path)];
+	char parent_path[strlen(path)+1];
 	char child_dir[UWUFS_FILE_NAME_SIZE];
 	status = split_path_parent_child(path, parent_path, child_dir);
 	if (status < 0)
-		return -ENOENT;
+		return status;
 	// printf("parent_path %s", parent_path);
 	// printf("child_dir %s", child_dir);
 
@@ -283,12 +288,79 @@ int uwufs_readdir(const char *path,
 	return 0;
 }
 
-// TODO:
+
+int __create_regular_file(const char *path,
+						  mode_t mode,
+						  struct fuse_file_info *fi)
+{
+	(void) fi; // TEMP: Don't care for now
+
+	uwufs_blk_t inode_num;
+	ssize_t file_exists_status;
+
+	char parent_path[strlen(path)+1];
+	char child_path[UWUFS_FILE_NAME_SIZE];
+
+	uwufs_blk_t parent_dir_inode_num;
+
+	uwufs_blk_t child_file_inode_num;
+	struct uwufs_inode child_file_inode;
+
+	ssize_t status;
+	status = split_path_parent_child(path, parent_path, child_path);
+	if (status < 0)
+		return status;
+
+	file_exists_status = namei(device_fd, path, NULL, &inode_num);
+	if (file_exists_status == -ENOENT) { // Create new file here
+#ifdef DEBUG
+		printf("__create_regular_file: creating new file\n");
+#endif
+		// Find parent inode
+		status = namei(device_fd, parent_path, NULL, &parent_dir_inode_num);
+		if (status < 0)
+			return -ENOENT;
+
+		// Get new empty inode
+		status = find_free_inode(device_fd, &child_file_inode_num);
+		RETURN_IF_ERROR(status);
+
+		// Add child file entry to parent dir
+		status = add_directory_file_entry(device_fd, parent_dir_inode_num,
+						   child_path, child_file_inode_num);
+		RETURN_IF_ERROR(status);
+
+		// Init child file inode
+		memset(&child_file_inode, 0, sizeof(struct uwufs_inode));
+		// TODO: Other file perms
+		child_file_inode.file_mode = F_TYPE_REGULAR | (mode & F_PERM_BITS);
+		child_file_inode.file_size = 0;
+
+		status = write_inode(device_fd, &child_file_inode,
+					   sizeof(child_file_inode), child_file_inode_num);
+		if (status < 0)
+			return -EIO;
+
+		return 0;
+	} else if (file_exists_status < 0) {
+		return file_exists_status;
+	}
+#ifdef DEBUG
+	printf("create_regular_file: file already exists");
+#endif
+	return 0; // Ok if file exists already
+}
+
 int uwufs_create(const char *path,
 				 mode_t mode,
 				 struct fuse_file_info *fi)
 {
-	return -ENOENT;
+#ifdef DEBUG
+	printf("uwufs_create: %s\n", path);
+#endif
+	if (S_ISREG(mode))
+		return  __create_regular_file(path, mode, fi);
+	return -EINVAL;
 }
 
 // TODO:
@@ -296,5 +368,6 @@ int uwufs_utimens(const char *path,
 				  const struct timespec tv[2],
 				  struct fuse_file_info *fi)
 {
-	return -ENOENT;
+	return 0; // TODO:
+	// return -ENOENT;
 }

@@ -26,7 +26,7 @@
 #define UWUFS_RESERVED_SPACE			1
 
 // Total file entry in a directory is 256 bytes
-#define UWUFS_FILE_NAME_SIZE			248
+#define UWUFS_FILE_NAME_SIZE			248 // includes null-terminator
 
 /* File access mode */
 typedef uint16_t uwufs_aflags_t; // Deprecated (use uint16_t directly)

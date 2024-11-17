@@ -93,9 +93,9 @@ int main(int argc, char* argv[]) {
 
 	// ---- Check root dir blk numbers to make sure unused set to 0 ----
 	printf("Root Directory Direct Block Numbers (all blocks)\n");
-	int i;
+	uwufs_blk_t i;
 	for (i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
-		printf("Direct block %d: %lu\n", i, root_directory_inode.direct_blks[i]);
+		printf("Direct block %lu: %lu\n", i, root_directory_inode.direct_blks[i]);
 	}
 
 	printf("Root Directory Entries (first block only):\n");
