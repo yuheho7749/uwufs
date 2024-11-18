@@ -16,6 +16,10 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifdef DEBUG
+#include <assert.h>
+#endif
+
 extern int device_fd;
 
 void* uwufs_init(struct fuse_conn_info *conn,
@@ -191,10 +195,154 @@ int uwufs_mkdir(const char *path,
 	return 0;
 }
 
+// TODO: Move to file_operations
+ssize_t __remove_entry_from_dir_data_blk(uwufs_blk_t dir_data_blk_num,
+										 const char name[UWUFS_FILE_NAME_SIZE],
+										 uwufs_blk_t file_inode_num)
+{
+	ssize_t status;
+	int i;
+	int n = UWUFS_BLOCK_SIZE/sizeof(struct uwufs_directory_file_entry);
+	struct uwufs_directory_data_blk dir_data_blk;
+	struct uwufs_directory_file_entry file_entry;
+
+	status = read_blk(device_fd, &dir_data_blk, dir_data_blk_num);
+	if (status < 0)
+		return status;
+
+	for (i = 0; i < n; i++) {
+		file_entry = dir_data_blk.file_entries[i];
+		if (file_entry.inode_num == file_inode_num &&
+			strcmp(file_entry.file_name, name) == 0) {
+			// clear file entry
+			memset(&dir_data_blk.file_entries[i], 0, sizeof(file_entry));
+			status = write_blk(device_fd, &dir_data_blk, dir_data_blk_num);
+			if (status < 0) return status;
+			return 0;
+		}
+	}
+	return -ENOENT;
+}
+
+/**
+ * TODO: Move to file_operations
+ * Removes directory entry
+ */
+ssize_t __unlink_file(const char *path,
+					  struct uwufs_inode *inode,
+					  uwufs_blk_t inode_num)
+{
+	ssize_t status;
+	struct uwufs_inode parent_inode;
+	uwufs_blk_t parent_inode_num;
+	char parent_path[strlen(path)+1];
+	char child_path[UWUFS_FILE_NAME_SIZE];
+	int i;
+	uwufs_blk_t dir_blk_num;
+
+	status = split_path_parent_child(path, parent_path, child_path);
+	if (status < 0)
+		return status;
+
+	status = namei(device_fd, parent_path, NULL, &parent_inode_num);
+	if (status < 0)
+		return -ENOENT;
+
+	status = read_inode(device_fd, &parent_inode, parent_inode_num);
+	if (status < 0)
+		return status;
+
+	for (i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
+		dir_blk_num = parent_inode.direct_blks[i];
+
+		if (dir_blk_num == 0)
+			continue;
+
+		status = __remove_entry_from_dir_data_blk(dir_blk_num, child_path,
+											inode_num);
+		if (status == -ENOENT)
+			continue;
+		else if (status < 0)
+			return status;
+
+		goto success_ret;
+	}
+	// TODO: Indirect blocks
+
+	return -ENOENT;
+
+success_ret:
+#ifdef DEBUG
+	assert(inode->file_links_count >= 1);
+#endif
+	inode->file_links_count -= 1;
+	return 0;
+}
+
+/**
+ * TODO: Move to file operations
+ * Clears the actual inode/file if the link count is 0
+ */
+ssize_t __remove_file(struct uwufs_inode *inode,
+					  uwufs_blk_t inode_num)
+{
+	ssize_t status;
+	int i;
+	for (i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
+		// TEMP: Check if it points to data blks (after ilist)
+		if (inode->direct_blks[i] <= 1 + UWUFS_RESERVED_SPACE)
+			continue;
+		status = free_blk(device_fd, inode->direct_blks[i]);
+		if (status < 0) return status;
+	}
+
+	// TODO: Indirect blocks
+
+	// NOTE: 2 options
+	// 1. mark as free inode
+	// 2. clear entire inode
+	inode->file_mode = F_TYPE_FREE;
+	// memset(inode, 0, sizeof(*inode));
+	return 0;
+}
+
 int uwufs_unlink(const char *path)
 {
-	// TODO:
-	return -1;
+	uwufs_blk_t inode_num;
+	struct uwufs_inode inode;
+	ssize_t status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
+
+	status = read_inode(device_fd, &inode, inode_num);
+	if (status < 0)
+		return status;
+
+	// TODO: Check file permissions using fuse_context
+
+	switch (inode.file_mode & F_TYPE_BITS) {
+		case F_TYPE_REGULAR:
+		// case F_TYPE_DIRECTORY: // should be handled by rmdir
+			status = __unlink_file(path, &inode, inode_num);
+			if (status < 0) return status;
+
+			// check if link count is 0
+			if (inode.file_links_count == 0) {
+				// free the data blk and inode
+				status = __remove_file(&inode, inode_num);
+				if (status < 0) return status;
+			}
+
+			// write back to inode
+			status = write_inode(device_fd, &inode, sizeof(inode), inode_num);
+			if (status < 0) return status;
+
+			return 0;
+		// TODO: other file types (Ex: symlinks don't have data blks)
+		default:
+			return -EINVAL;
+	}
+	return -EINVAL;
 }
 
 // TODO:
