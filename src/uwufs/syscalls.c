@@ -49,26 +49,32 @@ int uwufs_getattr(const char *path,
 	if (status < 0)
 		return -ENOENT;
 
-	// TODO: Fill in other file types and flags (not implemented yet)
-	uint16_t flags = inode.file_mode;
-	switch (flags & F_TYPE_BITS) {
+	uint16_t f_mode = inode.file_mode;
+	switch (f_mode & F_TYPE_BITS) {
 		case F_TYPE_DIRECTORY:
-			stbuf->st_mode = S_IFDIR | (flags & F_PERM_BITS);
-			stbuf->st_size = inode.file_size;
-			stbuf->st_ino = inode_num;
-			return 0;
+			stbuf->st_mode = S_IFDIR | (f_mode & F_PERM_BITS);
+			break;
 		case F_TYPE_REGULAR:
-			stbuf->st_mode = S_IFREG | (flags & F_PERM_BITS);
-			stbuf->st_size = inode.file_size;
-			stbuf->st_ino = inode_num;
-			return 0;
+			stbuf->st_mode = S_IFREG | (f_mode & F_PERM_BITS);
+			break;
 		default:
 			return -EINVAL;
 	}
-	return -ENOENT;
+	// TODO: Fill in other file types and flags (not implemented yet)
+	stbuf->st_ino = inode_num;
+	stbuf->st_size = inode.file_size;
+	stbuf->st_blksize = UWUFS_BLOCK_SIZE;
+	stbuf->st_blocks = ((inode.file_size + UWUFS_BLOCK_SIZE - 1)
+						/ UWUFS_BLOCK_SIZE) * 8;
+	stbuf->st_nlink = inode.file_links_count;
+	stbuf->st_uid = inode.file_uid;
+	stbuf->st_gid = inode.file_gid;
+	return 0;
 }
 
-int uwufs_mknod(const char *path, mode_t mode, dev_t device) {
+// NOTE: Might be uneeded because of uwufs_create
+int uwufs_mknod(const char *path, mode_t mode, dev_t device)
+{
 	return -ENOENT;
 }
 
@@ -115,6 +121,8 @@ int uwufs_mkdir(const char *path,
 				mode_t mode)
 {
 	ssize_t status;
+	// get the uid etc of the user
+	struct fuse_context *fuse_ctx = fuse_get_context();
 
 	// printf("original path %s", path);
 	// split path into parent + child parts
@@ -144,7 +152,7 @@ int uwufs_mkdir(const char *path,
 
 	// update the parent data blk 
 	status = add_directory_file_entry(device_fd, parent_dir_inode_num,
-						child_dir, child_dir_inode_num);
+						child_dir, child_dir_inode_num, 1);
 	RETURN_IF_ERROR(status);
 
 	// new child dir: populate . and .. entry
@@ -171,6 +179,9 @@ int uwufs_mkdir(const char *path,
 	new_inode.file_mode = F_TYPE_DIRECTORY | (F_PERM_BITS & mode);
 	new_inode.direct_blks[0] = new_blk_num;
 	new_inode.file_size = UWUFS_BLOCK_SIZE;
+	new_inode.file_links_count = 2; // includes "." refer to itself
+	new_inode.file_uid = fuse_ctx->uid;
+	new_inode.file_gid = fuse_ctx->gid;
 
 	// write new dir inode
 	status = write_inode(device_fd, &new_inode, sizeof(new_inode),
@@ -178,6 +189,18 @@ int uwufs_mkdir(const char *path,
 	RETURN_IF_ERROR(status);
 	
 	return 0;
+}
+
+int uwufs_unlink(const char *path)
+{
+	// TODO:
+	return -1;
+}
+
+// TODO:
+int uwufs_rmdir(const char *path)
+{
+	return -ENOENT;
 }
 
 // TODO:
@@ -306,6 +329,8 @@ int __create_regular_file(const char *path,
 	uwufs_blk_t child_file_inode_num;
 	struct uwufs_inode child_file_inode;
 
+	struct fuse_context *fuse_ctx = fuse_get_context();
+
 	ssize_t status;
 	status = split_path_parent_child(path, parent_path, child_path);
 	if (status < 0)
@@ -327,7 +352,7 @@ int __create_regular_file(const char *path,
 
 		// Add child file entry to parent dir
 		status = add_directory_file_entry(device_fd, parent_dir_inode_num,
-						   child_path, child_file_inode_num);
+						   child_path, child_file_inode_num, 0);
 		RETURN_IF_ERROR(status);
 
 		// Init child file inode
@@ -335,6 +360,9 @@ int __create_regular_file(const char *path,
 		// TODO: Other file perms
 		child_file_inode.file_mode = F_TYPE_REGULAR | (mode & F_PERM_BITS);
 		child_file_inode.file_size = 0;
+		child_file_inode.file_links_count = 1;
+		child_file_inode.file_uid = fuse_ctx->uid;
+		child_file_inode.file_gid = fuse_ctx->gid;
 
 		status = write_inode(device_fd, &child_file_inode,
 					   sizeof(child_file_inode), child_file_inode_num);

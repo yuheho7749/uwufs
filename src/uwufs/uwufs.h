@@ -67,6 +67,7 @@ struct __attribute__((__packed__)) uwufs_super_blk {
 	char padding[UWUFS_BLOCK_SIZE - (6 * sizeof(uwufs_blk_t))];
 };
 
+// 256 bytes for larger {a,m,c}times etc
 struct __attribute__((__packed__)) uwufs_inode {
 	uwufs_blk_t direct_blks[UWUFS_DIRECT_BLOCKS];
 	uwufs_blk_t single_indirect_blks;
@@ -74,13 +75,14 @@ struct __attribute__((__packed__)) uwufs_inode {
 	uwufs_blk_t triple_indirect_blks;
 	uint16_t file_mode; 		// file types/permissions
 	uint64_t file_size;
-	// TODO: owner, num of links, etc
-	
-	// Padding to get to 128 bytes
-	// uint64_t padding1;
-	uint64_t padding2;
-	uint32_t padding3;
-	uint16_t padding4;
+	uint16_t file_links_count;
+	uint32_t file_uid;
+	uint32_t file_gid;
+	uint64_t file_atime;
+	uint64_t file_mtime;
+	uint64_t file_ctime;
+
+	char padding[128 - 20];
 };
 
 struct __attribute__((__packed__)) uwufs_inode_blk {
