@@ -16,10 +16,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#ifdef DEBUG
-#include <assert.h>
-#endif
-
 extern int device_fd;
 
 void* uwufs_init(struct fuse_conn_info *conn,
@@ -80,37 +76,6 @@ int uwufs_getattr(const char *path,
 int uwufs_mknod(const char *path, mode_t mode, dev_t device)
 {
 	return -ENOENT;
-}
-
-ssize_t split_path_parent_child(const char *path,
-								char *parent_path,
-								char *child_dir) {
-    char path_copy[strlen(path)+1];
-	strcpy(path_copy, path);
-	char *last_dir = strrchr(path_copy, '/');
-    
-    if (last_dir != NULL) {
-        size_t length = last_dir - path_copy;
-        strncpy(parent_path, path_copy, length);
-        parent_path[length] = '\0';
-
-		size_t child_dir_length = strlen(last_dir+1); // start after '/'
-		if (child_dir_length >= UWUFS_FILE_NAME_SIZE) {
-			strncpy(child_dir, last_dir+1, UWUFS_FILE_NAME_SIZE);
-			child_dir[UWUFS_FILE_NAME_SIZE-1] = '\0';
-			return -ENAMETOOLONG;
-		}
-		strncpy(child_dir, last_dir+1, child_dir_length);
-		child_dir[child_dir_length] = '\0';
-		return 0;
-    } else {
-        // if no '/' is found, error
-		// paths should all start from root (?)
-#ifdef DEBUG
-		printf("Error with split_path_parent_child() function\n");
-#endif	
-		return -ENOENT;
-    }
 }
 
 // TODO: 
@@ -195,117 +160,6 @@ int uwufs_mkdir(const char *path,
 	return 0;
 }
 
-// TODO: Move to file_operations
-ssize_t __remove_entry_from_dir_data_blk(uwufs_blk_t dir_data_blk_num,
-										 const char name[UWUFS_FILE_NAME_SIZE],
-										 uwufs_blk_t file_inode_num)
-{
-	ssize_t status;
-	int i;
-	int n = UWUFS_BLOCK_SIZE/sizeof(struct uwufs_directory_file_entry);
-	struct uwufs_directory_data_blk dir_data_blk;
-	struct uwufs_directory_file_entry file_entry;
-
-	status = read_blk(device_fd, &dir_data_blk, dir_data_blk_num);
-	if (status < 0)
-		return status;
-
-	for (i = 0; i < n; i++) {
-		file_entry = dir_data_blk.file_entries[i];
-		if (file_entry.inode_num == file_inode_num &&
-			strcmp(file_entry.file_name, name) == 0) {
-			// clear file entry
-			memset(&dir_data_blk.file_entries[i], 0, sizeof(file_entry));
-			status = write_blk(device_fd, &dir_data_blk, dir_data_blk_num);
-			if (status < 0) return status;
-			return 0;
-		}
-	}
-	return -ENOENT;
-}
-
-/**
- * TODO: Move to file_operations
- * Removes directory entry
- */
-ssize_t __unlink_file(const char *path,
-					  struct uwufs_inode *inode,
-					  uwufs_blk_t inode_num)
-{
-	ssize_t status;
-	struct uwufs_inode parent_inode;
-	uwufs_blk_t parent_inode_num;
-	char parent_path[strlen(path)+1];
-	char child_path[UWUFS_FILE_NAME_SIZE];
-	int i;
-	uwufs_blk_t dir_blk_num;
-
-	status = split_path_parent_child(path, parent_path, child_path);
-	if (status < 0)
-		return status;
-
-	status = namei(device_fd, parent_path, NULL, &parent_inode_num);
-	if (status < 0)
-		return -ENOENT;
-
-	status = read_inode(device_fd, &parent_inode, parent_inode_num);
-	if (status < 0)
-		return status;
-
-	for (i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
-		dir_blk_num = parent_inode.direct_blks[i];
-
-		if (dir_blk_num == 0)
-			continue;
-
-		status = __remove_entry_from_dir_data_blk(dir_blk_num, child_path,
-											inode_num);
-		if (status == -ENOENT)
-			continue;
-		else if (status < 0)
-			return status;
-
-		goto success_ret;
-	}
-	// TODO: Indirect blocks
-
-	return -ENOENT;
-
-success_ret:
-#ifdef DEBUG
-	assert(inode->file_links_count >= 1);
-#endif
-	inode->file_links_count -= 1;
-	return 0;
-}
-
-/**
- * TODO: Move to file operations
- * Clears the actual inode/file if the link count is 0
- */
-ssize_t __remove_file(struct uwufs_inode *inode,
-					  uwufs_blk_t inode_num)
-{
-	ssize_t status;
-	int i;
-	for (i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
-		// TEMP: Check if it points to data blks (after ilist)
-		if (inode->direct_blks[i] <= 1 + UWUFS_RESERVED_SPACE)
-			continue;
-		status = free_blk(device_fd, inode->direct_blks[i]);
-		if (status < 0) return status;
-	}
-
-	// TODO: Indirect blocks
-
-	// NOTE: 2 options
-	// 1. mark as free inode
-	// 2. clear entire inode
-	inode->file_mode = F_TYPE_FREE;
-	// memset(inode, 0, sizeof(*inode));
-	return 0;
-}
-
 int uwufs_unlink(const char *path)
 {
 	uwufs_blk_t inode_num;
@@ -323,13 +177,13 @@ int uwufs_unlink(const char *path)
 	switch (inode.file_mode & F_TYPE_BITS) {
 		case F_TYPE_REGULAR:
 		// case F_TYPE_DIRECTORY: // should be handled by rmdir
-			status = __unlink_file(path, &inode, inode_num);
+			status = unlink_file(device_fd, path, &inode, inode_num);
 			if (status < 0) return status;
 
 			// check if link count is 0
 			if (inode.file_links_count == 0) {
 				// free the data blk and inode
-				status = __remove_file(&inode, inode_num);
+				status = remove_file(device_fd, &inode, inode_num);
 				if (status < 0) return status;
 			}
 
@@ -378,7 +232,7 @@ int uwufs_write(const char *path,
 	return -ENOENT;
 }
 
-static int uwufs_helper_readdir_blk(const struct uwufs_directory_data_blk blk,
+static int __uwufs_helper_readdir_blk(const struct uwufs_directory_data_blk blk,
 									void *buf,
 									fuse_fill_dir_t filler)
 {
@@ -446,7 +300,7 @@ int uwufs_readdir(const char *path,
 			return -EIO;
 
 		// At this point I have the dir data block
-		status = uwufs_helper_readdir_blk(dir_data_blk, buf, filler);
+		status = __uwufs_helper_readdir_blk(dir_data_blk, buf, filler);
 		if (status == 1)
 			// If buf is full, filler/helper will return 1
 			// return error or just not include the rest?
@@ -459,7 +313,7 @@ int uwufs_readdir(const char *path,
 	return 0;
 }
 
-
+// NOTE: Might want to move to file_operations if not using fuse_file_info
 int __create_regular_file(const char *path,
 						  mode_t mode,
 						  struct fuse_file_info *fi)

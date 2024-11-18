@@ -12,4 +12,7 @@ A universal and (hopefully) working userspace filesystem for 64-bit linux-like s
 ## Phase2: Build, format, and mount uwufs
 1. Run `make mkfs.uwu` and `make mount.uwu` (or `make all`) to build binaries. You can add `DEBUG=1` to compile with debug information.
 2. Run `./mkfs.uwu [device]` with elevated privileges to format your block device
-3. Run `./mount.uwu [device] [mountpoint] [optional: flags]` to mount the block device and start the fuse daemon. You can optionally include `-f` flag to make fuse run in the forground.
+3. Run `./mount.uwu [device] [mountpoint] [optional: flags]` to mount the block device and start the fuse daemon.
+### Optional flags
+- `-f`: make fuse run in the forground.
+- `-o allow_other`: allow other users access to the fuse fs (we handle permissions ourselves)
