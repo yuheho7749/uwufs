@@ -82,6 +82,7 @@ struct __attribute__((__packed__)) uwufs_inode {
 	uint64_t file_mtime;
 	uint64_t file_ctime;
 
+	// NOTE: might want to also track nano seconds for {a,m,c}time
 	char padding[128 - 20];
 };
 

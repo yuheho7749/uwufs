@@ -69,6 +69,9 @@ int uwufs_getattr(const char *path,
 	stbuf->st_nlink = inode.file_links_count;
 	stbuf->st_uid = inode.file_uid;
 	stbuf->st_gid = inode.file_gid;
+	stbuf->st_ctime = inode.file_ctime;
+	stbuf->st_mtime = inode.file_mtime;
+	stbuf->st_atime = inode.file_atime;
 	return 0;
 }
 
@@ -90,6 +93,7 @@ int uwufs_mkdir(const char *path,
 				mode_t mode)
 {
 	ssize_t status;
+	time_t unix_time;
 	// get the uid etc of the user
 	struct fuse_context *fuse_ctx = fuse_get_context();
 
@@ -151,6 +155,12 @@ int uwufs_mkdir(const char *path,
 	new_inode.file_links_count = 2; // includes "." refer to itself
 	new_inode.file_uid = fuse_ctx->uid;
 	new_inode.file_gid = fuse_ctx->gid;
+	unix_time = time(NULL);
+	if (unix_time == -1)
+		unix_time = 0;
+	new_inode.file_ctime = (uint64_t)unix_time;
+	new_inode.file_mtime = (uint64_t)unix_time;
+	new_inode.file_atime = (uint64_t)unix_time;
 
 	// write new dir inode
 	status = write_inode(device_fd, &new_inode, sizeof(new_inode),
@@ -194,9 +204,13 @@ int uwufs_unlink(const char *path)
 			return 0;
 		// TODO: other file types (Ex: symlinks don't have data blks)
 		default:
+#ifdef DEBUG
+			printf("uwufs_unlink: unknown file type %d\n",
+		  inode.file_mode & F_TYPE_BITS);
+#endif
 			return -EINVAL;
 	}
-	return -EINVAL;
+	return -EIO;
 }
 
 // TODO:
@@ -320,7 +334,6 @@ int __create_regular_file(const char *path,
 {
 	(void) fi; // TEMP: Don't care for now
 
-	uwufs_blk_t inode_num;
 	ssize_t file_exists_status;
 
 	char parent_path[strlen(path)+1];
@@ -332,13 +345,17 @@ int __create_regular_file(const char *path,
 	struct uwufs_inode child_file_inode;
 
 	struct fuse_context *fuse_ctx = fuse_get_context();
+	time_t unix_time;
+	unix_time = time(NULL);
+	if (unix_time == -1)
+		unix_time = 0;
 
 	ssize_t status;
 	status = split_path_parent_child(path, parent_path, child_path);
 	if (status < 0)
 		return status;
 
-	file_exists_status = namei(device_fd, path, NULL, &inode_num);
+	file_exists_status = namei(device_fd, path, NULL, &child_file_inode_num);
 	if (file_exists_status == -ENOENT) { // Create new file here
 #ifdef DEBUG
 		printf("__create_regular_file: creating new file\n");
@@ -365,20 +382,24 @@ int __create_regular_file(const char *path,
 		child_file_inode.file_links_count = 1;
 		child_file_inode.file_uid = fuse_ctx->uid;
 		child_file_inode.file_gid = fuse_ctx->gid;
+		child_file_inode.file_ctime = (uint64_t)unix_time;
+		child_file_inode.file_mtime = (uint64_t)unix_time;
 
-		status = write_inode(device_fd, &child_file_inode,
-					   sizeof(child_file_inode), child_file_inode_num);
-		if (status < 0)
-			return -EIO;
-
-		return 0;
+		goto success_ret;
 	} else if (file_exists_status < 0) {
 		return file_exists_status;
 	}
 #ifdef DEBUG
 	printf("create_regular_file: file already exists");
 #endif
-	return 0; // Ok if file exists already
+success_ret:
+	child_file_inode.file_atime = (uint64_t)unix_time;
+	status = write_inode(device_fd, &child_file_inode,
+				   sizeof(child_file_inode), child_file_inode_num);
+	if (status < 0)
+		return -EIO;
+
+	return 0;
 }
 
 int uwufs_create(const char *path,
@@ -393,11 +414,45 @@ int uwufs_create(const char *path,
 	return -EINVAL;
 }
 
-// TODO:
 int uwufs_utimens(const char *path,
 				  const struct timespec tv[2],
 				  struct fuse_file_info *fi)
 {
-	return 0; // TODO:
-	// return -ENOENT;
+	(void) fi;
+	ssize_t status;
+	uwufs_blk_t inode_num;
+	struct uwufs_inode inode;
+	time_t unix_time;
+	unix_time = time(NULL);
+	if (unix_time == -1)
+		unix_time = 0;
+
+	status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return status;
+
+	status = read_inode(device_fd, &inode, inode_num);
+	if (status < 0)
+		return status;
+
+	if (tv[0].tv_nsec == UTIME_NOW) {
+		inode.file_atime = (uint64_t)unix_time;
+	} else if (tv[0].tv_nsec == UTIME_OMIT) {
+		// Do nothing
+	} else {
+		inode.file_atime = (uint64_t)tv[0].tv_sec;
+	}
+	if (tv[1].tv_nsec == UTIME_NOW) {
+		inode.file_atime = (uint64_t)unix_time;
+	} else if (tv[1].tv_nsec == UTIME_OMIT) {
+		// Do nothing
+	} else {
+		inode.file_atime = (uint64_t)tv[1].tv_sec;
+	}
+
+	status = write_inode(device_fd, &inode, sizeof(inode), inode_num);
+	if (status < 0)
+		return status;
+
+	return 0;
 }

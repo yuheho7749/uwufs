@@ -11,6 +11,8 @@
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
+#include <stdbool.h>
 
 #ifdef DEBUG
 #include <assert.h>
@@ -52,6 +54,10 @@ ssize_t add_directory_file_entry(int fd,
 								 int nlinks_change)
 {
 	ssize_t status;
+	time_t unix_time;
+	unix_time = time(NULL);
+	if (unix_time == -1)
+		unix_time = 0;
 
 	struct uwufs_inode dir_inode;
 	read_inode(fd, &dir_inode, dir_inode_num);
@@ -69,6 +75,7 @@ ssize_t add_directory_file_entry(int fd,
 
 			dir_inode.direct_blks[i] = dir_blk_num;
 			dir_inode.file_size += UWUFS_BLOCK_SIZE;
+			dir_inode.file_ctime = (uint64_t)unix_time;
 
 			memset(&dir_blk, 0, sizeof(dir_blk));
 		}
@@ -82,6 +89,11 @@ ssize_t add_directory_file_entry(int fd,
 
 		// increase nlinks (if added new dir)
 		dir_inode.file_links_count += nlinks_change;
+		if (nlinks_change != 0)
+			dir_inode.file_ctime = (uint64_t)unix_time;
+		dir_inode.file_mtime = (uint64_t)unix_time;
+		dir_inode.file_atime = (uint64_t)unix_time;
+
 		write_inode(fd, &dir_inode, sizeof(dir_inode), dir_inode_num);
 
 		// not sure if want to keep write in this fn or move out of 
@@ -133,6 +145,8 @@ ssize_t __remove_entry_from_dir_data_blk(int fd,
 {
 	ssize_t status;
 	int i;
+	int entries = 0;
+	bool has_not_removed = true;
 	int n = UWUFS_BLOCK_SIZE/sizeof(struct uwufs_directory_file_entry);
 	struct uwufs_directory_data_blk dir_data_blk;
 	struct uwufs_directory_file_entry file_entry;
@@ -143,16 +157,22 @@ ssize_t __remove_entry_from_dir_data_blk(int fd,
 
 	for (i = 0; i < n; i++) {
 		file_entry = dir_data_blk.file_entries[i];
-		if (file_entry.inode_num == file_inode_num &&
+		if (file_entry.inode_num != 0)
+			entries += 1;
+		if (has_not_removed &&
+			file_entry.inode_num == file_inode_num &&
 			strcmp(file_entry.file_name, name) == 0) {
+			has_not_removed = false;
 			// clear file entry
 			memset(&dir_data_blk.file_entries[i], 0, sizeof(file_entry));
 			status = write_blk(fd, &dir_data_blk, dir_data_blk_num);
 			if (status < 0) return status;
-			return 0;
 		}
 	}
-	return -ENOENT;
+	if (has_not_removed)
+		return -ENOENT;
+
+	return entries - 1;
 }
 
 /**
@@ -164,12 +184,17 @@ ssize_t unlink_file(int fd,
 					  uwufs_blk_t inode_num)
 {
 	ssize_t status;
+	time_t unix_time;
 	struct uwufs_inode parent_inode;
 	uwufs_blk_t parent_inode_num;
 	char parent_path[strlen(path)+1];
 	char child_path[UWUFS_FILE_NAME_SIZE];
 	int i;
 	uwufs_blk_t dir_blk_num;
+
+	unix_time = time(NULL);
+	if (unix_time == -1)
+		unix_time = 0;
 
 	status = split_path_parent_child(path, parent_path, child_path);
 	if (status < 0)
@@ -193,8 +218,17 @@ ssize_t unlink_file(int fd,
 											inode_num);
 		if (status == -ENOENT)
 			continue;
-		else if (status < 0)
+		if (status < 0)
 			return status;
+
+		// if there are no more entries in dir_data_blk, free it
+		if (status == 0) {
+			status = free_blk(fd, dir_blk_num);
+			// NOTE: might compact the blks later
+			parent_inode.direct_blks[i] = 0;
+			parent_inode.file_size -= UWUFS_BLOCK_SIZE;
+			parent_inode.file_ctime = (uint64_t)unix_time;
+		}
 
 		goto success_ret;
 	}
@@ -207,6 +241,12 @@ success_ret:
 	assert(inode->file_links_count >= 1);
 #endif
 	inode->file_links_count -= 1;
+	inode->file_ctime = (uint64_t)unix_time;
+	parent_inode.file_atime = (uint64_t)unix_time;
+	parent_inode.file_mtime = (uint64_t)unix_time;
+	status = write_inode(fd, &parent_inode, sizeof(parent_inode),
+					  parent_inode_num);
+	if (status < 0) return status;
 	return 0;
 }
 /**

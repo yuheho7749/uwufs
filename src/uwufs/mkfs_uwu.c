@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <time.h>
 
 #ifdef __linux__
 #include <linux/fs.h>
@@ -186,6 +187,7 @@ static void init_root_directory(int fd)
 	struct uwufs_inode root_inode;
 	memset(&root_inode, 0, sizeof(root_inode));
 	ssize_t status;
+	time_t unix_time;
 
 	// TODO: Abstract this to add_directory_file_entry (which is
 	// 		different from create_directory_file_entry)
@@ -218,6 +220,18 @@ static void init_root_directory(int fd)
 	root_inode.direct_blks[0] = blk_num;
 	root_inode.file_size = UWUFS_BLOCK_SIZE;
 	root_inode.file_links_count = 2; // Account for "." refer to itself
+	root_inode.file_uid = 0;
+	root_inode.file_gid = 0;
+	unix_time = time(NULL);
+	if (unix_time == -1) {
+		root_inode.file_ctime = 0;
+		root_inode.file_mtime = 0;
+		root_inode.file_atime = 0;
+	} else {
+		root_inode.file_ctime = (uint64_t)unix_time;
+		root_inode.file_mtime = (uint64_t)unix_time;
+		root_inode.file_atime = (uint64_t)unix_time;
+	}
 
 	// Write to root inode
 	status = write_inode(fd, &root_inode, sizeof(root_inode),
