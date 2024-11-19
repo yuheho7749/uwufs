@@ -187,7 +187,7 @@ int uwufs_unlink(const char *path)
 	switch (inode.file_mode & F_TYPE_BITS) {
 		case F_TYPE_REGULAR:
 		// case F_TYPE_DIRECTORY: // should be handled by rmdir
-			status = unlink_file(device_fd, path, &inode, inode_num);
+			status = unlink_file(device_fd, path, &inode, inode_num, 0);
 			if (status < 0) return status;
 
 			// check if link count is 0
@@ -215,7 +215,7 @@ int uwufs_unlink(const char *path)
 
 
 int uwufs_rmdir(const char *path)
-{
+{	
 	// split parent & child parts
 	ssize_t status;
 	char parent_path[strlen(path)+1];
@@ -237,8 +237,7 @@ int uwufs_rmdir(const char *path)
 	// get child inode
 	uwufs_blk_t child_dir_inode_num;
 	status = namei(device_fd, path, NULL, &child_dir_inode_num);
-	if (status < 0) 
-		return -ENOENT;
+	RETURN_IF_ERROR(status);
 
 	// read child inode 
 	struct uwufs_inode child_dir_inode;
@@ -250,30 +249,36 @@ int uwufs_rmdir(const char *path)
 
 	// TODO: check permissions to see if user allowed to rmdir
 
-	// check that the only entries are . and .. (2 links)
-	// could also explicitly check data blks only contain entries . and ..
-	if (child_dir_inode.file_links_count > 2) {
+	// check that there are only 2 entries in dir
+	// could also explicitly check for '.' and '..' only
+	int num_dir_entries = 0;
+	status = count_directory_file_entries(device_fd, 
+										  &child_dir_inode, &num_dir_entries);
+	RETURN_IF_ERROR(status);
+	if (num_dir_entries > 2)
 		return -ENOTEMPTY;
-	}
+
+	// check only 2 links as well
 	// NOTE: this shouldn't happen, but handle in case 
-	if (child_dir_inode.file_links_count < 2) {
+	if (child_dir_inode.file_links_count != 2) {
 #ifdef DEBUG
-		perror("The directory that was specified for removal has less than "
-				"2 links, but it should have exactly 2 (. and ..)\n");
-#endif
-		return -ENOTDIR; // not sure if better error code to use here
+		printf("The directory has %d links but also has exactly 2 entries\n",
+				 child_dir_inode.file_links_count);
+#endif			
+		return -ENOTEMPTY;
 	}
 
 	// remove the entry for the child dir from the parent dir blks
-	status = unlink_file(device_fd, path, &child_dir_inode, child_dir_inode_num);
-	RETURN_IF_ERROR(status);
+	status = unlink_file(device_fd, path, &child_dir_inode, 
+				         child_dir_inode_num, 1);
+	if (status < 0) return -EIO;
 
 	// remove child dir (sets inode to FREE & clears data blks)
 	status = remove_file(device_fd, &child_dir_inode, child_dir_inode_num);
-	RETURN_IF_ERROR(status);
+	if (status < 0) return -EIO;
 	status = write_inode(device_fd, &child_dir_inode, 
 						 sizeof(struct uwufs_inode), child_dir_inode_num);
-	RETURN_IF_ERROR(status);
+	if (status < 0) return -EIO;
 
 	return 0;
 }

@@ -1,7 +1,7 @@
 /**
  * File operations for uwufs.
  *
- * Author: Joseph
+ * Authors: Joseph, Kay
  */
 
 #ifndef FILE_OPERATIONS_H
@@ -59,6 +59,19 @@ ssize_t add_directory_file_entry(int fd,
 								 uwufs_blk_t file_inode_num,
 								 int nlinks_change);
 
+/** 
+ * Counts and stores the # of entries in the directory
+ * in `nentries`
+ * 
+ * Parameters:
+ * `fd`: block device
+ * `dir_inode`: the directory inode
+ * `nentries`: int to store count
+*/
+ssize_t count_directory_file_entries(int fd,
+								 	 struct uwufs_inode *dir_inode,
+								 	 int *nentries);
+
 ssize_t split_path_parent_child(const char *path,
 								char *parent_path,
 								char *child_dir);
@@ -67,11 +80,25 @@ ssize_t __remove_entry_from_dir_data_blk(int fd,
 										 uwufs_blk_t dir_data_blk_num,
 										 const char name[UWUFS_FILE_NAME_SIZE],
 										 uwufs_blk_t file_inode_num);
-
+/**
+ * Removes a file entry in its parent directory
+ * 
+ *  Parameters:
+ * `fd`: block device
+ * `path`: path to child entry
+ * `inode`: child inode
+ * `inode_num`: child inode num
+ * `nlinks_change`: change to the parent dir file links count
+ * 
+ * NOTE: nlinks_change should be 0 unless removing a subdir
+ * and then it should be 1... may want to make this a bool?
+ * (same goes for add_directory_file_entry)
+ */
 ssize_t unlink_file(int fd,
 					  const char *path,
 					  struct uwufs_inode *inode,
-					  uwufs_blk_t inode_num);
+					  uwufs_blk_t inode_num,
+					  int nlinks_change);
 
 ssize_t remove_file(int fd,
 					  struct uwufs_inode *inode,

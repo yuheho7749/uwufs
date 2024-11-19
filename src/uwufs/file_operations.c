@@ -110,6 +110,38 @@ ssize_t add_directory_file_entry(int fd,
 	return -ENOSPC;
 }
 
+ssize_t count_directory_file_entries(int fd,
+								 	 struct uwufs_inode *dir_inode,
+								 	 int *nentries)
+{
+	ssize_t status;
+
+	struct uwufs_directory_data_blk dir_blk;
+	struct uwufs_directory_file_entry file_entry;
+	int i;
+	int j;
+	int n = UWUFS_BLOCK_SIZE/sizeof(file_entry);
+	int num_entries = 0;
+
+	for (i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
+		uwufs_blk_t dir_blk_num = dir_inode->direct_blks[i];
+		if (dir_blk_num == 0) {
+			continue;
+		}
+		status = read_blk(fd, &dir_blk, dir_blk_num);
+		RETURN_IF_ERROR(status);
+
+		for (j = 0; j < n; j++) {
+			file_entry = dir_blk.file_entries[j];
+			if (file_entry.inode_num != 0) {
+				num_entries++;
+			}		
+		}
+	}
+	*nentries = num_entries;
+	return 0;
+}
+
 ssize_t split_path_parent_child(const char *path,
 								char *parent_path,
 								char *child_dir)
@@ -185,7 +217,8 @@ ssize_t __remove_entry_from_dir_data_blk(int fd,
 ssize_t unlink_file(int fd,
 					  const char *path,
 					  struct uwufs_inode *inode,
-					  uwufs_blk_t inode_num)
+					  uwufs_blk_t inode_num,
+					  int nlinks_change)
 {
 	ssize_t status;
 	time_t unix_time;
@@ -246,6 +279,7 @@ success_ret:
 #endif
 	inode->file_links_count -= 1;
 	inode->file_ctime = (uint64_t)unix_time;
+	parent_inode.file_links_count -= nlinks_change; //unlinking subdir
 	parent_inode.file_atime = (uint64_t)unix_time;
 	parent_inode.file_mtime = (uint64_t)unix_time;
 	status = write_inode(fd, &parent_inode, sizeof(parent_inode),
