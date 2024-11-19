@@ -46,6 +46,17 @@ echo "TEST rmdir -p for test-nested/a"
 rmdir -p test-nested/a # should remove all
 echo -e "\t==> Above should return 0 errors"
 
+# test with rm instead of rmdir 
+mkdir test-nested
+mkdir test-nested/a
+mkdir test-nested/a/b
+mkdir test-nested/a/b/c
+echo "TEST with rm instead of rmdir"
+rm -d test-nested/a/b/c
+rm -r test-nested
+echo -e "\t==> Above should return 0 errors"
+
+
 # done
 echo "Leaving /mnt directory and unmounting..."
 cd -
