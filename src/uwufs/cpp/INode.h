@@ -4,7 +4,8 @@
 #include "../uwufs.h"
 
 
-class DataBlockIterator;
+class DataBlockIterator;    // forward declaration
+
 
 // This class is a wrapper around the uwufs_inode struct
 // It never writes to disk, only modifies the in-memory inode
@@ -37,6 +38,10 @@ public:
 
     uwufs_inode* inode; // not owned
     int device_fd;
+
+    // static functions
+    static uwufs_blk_t static_get_dblk(const uwufs_inode* inode, int device_fd, uwufs_blk_t index);
+    static DataBlockIterator static_dblk_itr(const uwufs_inode* inode, int device_fd, uwufs_blk_t start_index);
 };
 
 

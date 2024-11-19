@@ -3,7 +3,7 @@
 
 #include "../uwufs.h"
 #include "INode.h"
-#include <bits/stdint-uintn.h>
+// #include <bits/stdint-uintn.h>
 #include <iterator>
 #include <memory>
 
