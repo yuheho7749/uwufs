@@ -10,7 +10,8 @@
 #include "uwufs.h"
 #include <stdlib.h>
 
-// TODO: Not Implemented yet (feel free to change function signature)
+// NOTE: Not Implemented yet (feel free to change function signature)
+// 		(see syscall.c `__create_regular_file` for a similar function)
 /**
  * Creates a file using file mode. The resulting file inode is
  * 		saved in `inode` output var
@@ -57,4 +58,22 @@ ssize_t add_directory_file_entry(int fd,
 								 const char name[UWUFS_FILE_NAME_SIZE],
 								 uwufs_blk_t file_inode_num,
 								 int nlinks_change);
+
+ssize_t split_path_parent_child(const char *path,
+								char *parent_path,
+								char *child_dir);
+
+ssize_t __remove_entry_from_dir_data_blk(int fd,
+										 uwufs_blk_t dir_data_blk_num,
+										 const char name[UWUFS_FILE_NAME_SIZE],
+										 uwufs_blk_t file_inode_num);
+
+ssize_t unlink_file(int fd,
+					  const char *path,
+					  struct uwufs_inode *inode,
+					  uwufs_blk_t inode_num);
+
+ssize_t remove_file(int fd,
+					  struct uwufs_inode *inode,
+					  uwufs_blk_t inode_num);
 #endif

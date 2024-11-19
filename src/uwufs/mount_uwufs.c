@@ -23,7 +23,6 @@ int device_fd;
 
 static const struct fuse_operations uwufs_oper = {
 	.getattr	= uwufs_getattr,
-	.mknod		= uwufs_mknod,
 	.mkdir		= uwufs_mkdir,
 	.unlink		= uwufs_unlink,
 	.rmdir		= uwufs_rmdir,
