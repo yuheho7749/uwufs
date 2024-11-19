@@ -60,7 +60,8 @@ ssize_t add_directory_file_entry(int fd,
 		unix_time = 0;
 
 	struct uwufs_inode dir_inode;
-	read_inode(fd, &dir_inode, dir_inode_num);
+	status = read_inode(fd, &dir_inode, dir_inode_num);
+	RETURN_IF_ERROR(status);
 
 	struct uwufs_directory_data_blk dir_blk;
 	int i;
@@ -80,7 +81,8 @@ ssize_t add_directory_file_entry(int fd,
 			memset(&dir_blk, 0, sizeof(dir_blk));
 		}
 		else {
-			read_blk(fd, &dir_blk, dir_blk_num);
+			status = read_blk(fd, &dir_blk, dir_blk_num);
+			RETURN_IF_ERROR(status);
 		}
 
 		status = put_directory_file_entry(&dir_blk, name, file_inode_num);
@@ -94,10 +96,12 @@ ssize_t add_directory_file_entry(int fd,
 		dir_inode.file_mtime = (uint64_t)unix_time;
 		dir_inode.file_atime = (uint64_t)unix_time;
 
-		write_inode(fd, &dir_inode, sizeof(dir_inode), dir_inode_num);
+		status = write_inode(fd, &dir_inode, sizeof(dir_inode), dir_inode_num);
+		RETURN_IF_ERROR(status);
 
 		// not sure if want to keep write in this fn or move out of 
 		status = write_blk(fd, &dir_blk, dir_blk_num);
+		RETURN_IF_ERROR(status);
 		return 0;
 	}
 
