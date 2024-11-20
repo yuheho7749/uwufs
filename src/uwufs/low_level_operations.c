@@ -202,7 +202,7 @@ ssize_t find_free_inode(int fd, uwufs_blk_t *inode_num) {
         if (status < 0) 
 			goto debug_msg_ret;
 
-        int inodes_per_block = (UWUFS_BLOCK_SIZE / UWUFS_INODE_DEFAULT_SIZE);
+        int inodes_per_block = (UWUFS_BLOCK_SIZE / sizeof(struct uwufs_inode));
 
         // check each inode in the inode block
         for (int inode_in_blk = 0; inode_in_blk < inodes_per_block; 
@@ -296,7 +296,7 @@ ssize_t namei(int fd,
 	ssize_t status;
 
 	if (root_dir_inode != NULL) 
-		memcpy(&current_inode, root_dir_inode, UWUFS_INODE_DEFAULT_SIZE);
+		memcpy(&current_inode, root_dir_inode, sizeof(current_inode));
 	else {
 		status = read_inode(fd, &current_inode, current_inode_number);
 		if (status < 0) {

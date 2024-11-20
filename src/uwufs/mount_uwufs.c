@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
 	ret = ioctl(device_fd, BLKGETSIZE64, &blk_dev_size);
 #else
 	perror("Unsupported operating system: not Linux");
-	close(fd);
+	close(device_fd);
 	return 1;
 #endif
 	if (ret < 0) {

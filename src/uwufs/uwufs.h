@@ -15,7 +15,7 @@
 
 /* uwufs defaults (can be changed) */
 #define UWUFS_ILIST_DEFAULT_PERCENTAGE 	0.1f
-#define UWUFS_INODE_DEFAULT_SIZE		128
+#define UWUFS_INODE_DEFAULT_SIZE		256
 
 #define UWUFS_DIRECT_BLOCKS				10
 #define UWUFS_INDIRECT_BLOCKS			1

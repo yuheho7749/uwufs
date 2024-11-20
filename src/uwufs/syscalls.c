@@ -148,7 +148,7 @@ int uwufs_mkdir(const char *path,
 
 	// TODO: add other permissions, metadata, etc
 	struct uwufs_inode new_inode;
-	memset(&new_inode, 0, UWUFS_INODE_DEFAULT_SIZE);
+	memset(&new_inode, 0, sizeof(new_inode));
 	new_inode.file_mode = F_TYPE_DIRECTORY | (F_PERM_BITS & mode);
 	new_inode.direct_blks[0] = new_blk_num;
 	new_inode.file_size = UWUFS_BLOCK_SIZE;
