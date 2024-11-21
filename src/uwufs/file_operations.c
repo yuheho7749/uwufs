@@ -313,3 +313,122 @@ ssize_t remove_file(int fd,
 	// memset(inode, 0, sizeof(*inode));
 	return 0;
 }
+
+
+
+ssize_t read_file(int fd, 
+				  char *buf,
+				  size_t size,
+				  off_t offset,
+				  struct uwufs_inode *inode)
+{
+	ssize_t status;
+	size_t offset_bytes = offset % UWUFS_BLOCK_SIZE;
+	uwufs_blk_t offset_blk = offset / UWUFS_BLOCK_SIZE; 
+	
+	// TODO: indirect blks, only handles direct blks for now!
+	uwufs_blk_t cur_blk_num = offset_blk;
+	size_t cur_bytes_read = 0;
+
+	struct uwufs_regular_file_data_blk data_blk;
+	while (cur_blk_num < UWUFS_DIRECT_BLOCKS &&
+			cur_bytes_read < size) {
+
+		if (inode->direct_blks[cur_blk_num] == 0) {
+			//return 0;
+			return cur_bytes_read;
+		}
+		
+		status = read_blk(fd, &data_blk, inode->direct_blks[cur_blk_num]);
+		RETURN_IF_ERROR(status);
+
+		if (offset_bytes > 0 && cur_bytes_read == 0) {
+			// TODO: only copy from offset byte
+			// read in blk first and memcpy from offset
+		}
+
+		// read full block
+		size_t bytes_remaining = size - cur_bytes_read;
+		if (bytes_remaining > UWUFS_BLOCK_SIZE) {
+			memcpy(buf + cur_bytes_read, &data_blk, sizeof(data_blk));
+			cur_bytes_read += UWUFS_BLOCK_SIZE;
+		}
+		else { // only read part of block up to size provided
+			memcpy(buf + cur_bytes_read, &data_blk, bytes_remaining);
+			cur_bytes_read += bytes_remaining;
+			return cur_bytes_read;
+		}
+
+		cur_blk_num += 1;
+	}
+	return cur_bytes_read;
+}
+
+
+
+ssize_t write_file(int fd, 
+				  const char *buf,
+				  size_t size,
+				  off_t offset,
+				  struct uwufs_inode *inode,
+				  uwufs_blk_t inode_num)
+{
+	ssize_t status;
+	size_t offset_bytes = offset % UWUFS_BLOCK_SIZE;
+	uwufs_blk_t offset_blk = offset / UWUFS_BLOCK_SIZE; 
+
+	// TODO: indirect blks, only handles direct blks for now!
+	uwufs_blk_t cur_blk_num = offset_blk;
+	size_t cur_bytes_written = 0;
+
+	struct uwufs_regular_file_data_blk data_blk;
+	while (cur_blk_num < UWUFS_DIRECT_BLOCKS &&
+			cur_bytes_written < size) {
+		
+		uwufs_blk_t new_blk_num = inode->direct_blks[cur_blk_num];
+		if (new_blk_num == 0) {
+			status = malloc_blk(fd, &new_blk_num);
+			RETURN_IF_ERROR(status);
+			inode->direct_blks[cur_blk_num] = new_blk_num;
+			memset(&data_blk, 0, UWUFS_BLOCK_SIZE);
+		} 
+		
+		if (offset_bytes > 0 && cur_bytes_written == 0) {
+			// need to read or memset the full block first, 
+			// and only write part of it from offset
+		}
+
+		// write full block
+		size_t bytes_remaining = size - cur_bytes_written;
+		if (bytes_remaining >= UWUFS_BLOCK_SIZE) {
+			
+			memcpy(&data_blk, buf + cur_bytes_written, sizeof(data_blk));
+			cur_bytes_written += UWUFS_BLOCK_SIZE;
+		}
+		else { // only write part of block up to size provided
+			memcpy(&data_blk, buf + cur_bytes_written, bytes_remaining);
+			cur_bytes_written += bytes_remaining;
+		}
+
+		status = write_blk(fd, &data_blk, new_blk_num);
+		RETURN_IF_ERROR(status);
+
+		cur_blk_num += 1;
+	}
+	time_t unix_time;
+	unix_time = time(NULL);
+	inode->file_atime = (int64_t)unix_time;
+	inode->file_mtime = (int64_t)unix_time;
+	inode->file_ctime = (int64_t)unix_time;
+
+	// MUST CHANGE; only for now
+	inode->file_size = cur_bytes_written;
+
+	status = write_inode(fd, inode, sizeof(struct uwufs_inode), inode_num);
+	RETURN_IF_ERROR(status);
+
+#ifdef DEBUG
+	printf("Have %ld bytes written\n", cur_bytes_written);
+#endif
+	return cur_bytes_written; 
+}
