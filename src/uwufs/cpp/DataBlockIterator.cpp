@@ -1,5 +1,6 @@
 #include "DataBlockIterator.h"
 #include "../low_level_operations.h"
+#include <cstdio>
 
 #ifndef assert_low_level_operations
 #define assert_low_level_operations(ret) \

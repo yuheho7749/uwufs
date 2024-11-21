@@ -54,7 +54,7 @@ $(CPP_SRC_DIR)/DataBlockIterator.o: $(CPP_SRC_DIR)/DataBlockIterator.cpp
 $(CPP_SRC_DIR)/INode.o: $(CPP_SRC_DIR)/INode.cpp
 	$(CXX) $(CFLAGS) -c $< -o $@
 
-c_api_test: $(COMMON_FILES) $(SRC_DIR)/test/c_api_test.c $(CPP_SRC_DIR)/c_api.o $(CPP_SRC_DIR)/DataBlockIterator.o $(CPP_SRC_DIR)/INode.o
+c_api_test: $(COMMON_FILES) $(SRC_DIR)/test/c_api_test.cpp $(CPP_SRC_DIR)/c_api.o $(CPP_SRC_DIR)/DataBlockIterator.o $(CPP_SRC_DIR)/INode.o
 	$(CXX) $(CFLAGS) $^ -lfuse3 -o $@
 
 clean:

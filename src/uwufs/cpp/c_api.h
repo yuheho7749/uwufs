@@ -48,6 +48,8 @@ uwufs_blk_t dblk_itr_next(dblk_itr_t itr);
  */
 void destroy_dblk_itr(dblk_itr_t itr);
 
+uwufs_blk_t append_dblk(struct uwufs_inode* inode, int device_fd, uwufs_blk_t index, uwufs_blk_t block_no);
+
 #ifdef __cplusplus
 }
 #endif
