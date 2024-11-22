@@ -270,7 +270,7 @@ int uwufs_rmdir(const char *path)
 
 	// remove the entry for the child dir from the parent dir blks
 	status = unlink_file(device_fd, path, &child_dir_inode, 
-				         child_dir_inode_num, 1);
+				         child_dir_inode_num, -1);
 	if (status < 0) return -EIO;
 
 	// remove child dir (sets inode to FREE & clears data blks)

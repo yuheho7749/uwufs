@@ -280,7 +280,7 @@ success_ret:
 #endif
 	inode->file_links_count -= 1;
 	inode->file_ctime = (uint64_t)unix_time;
-	parent_inode.file_links_count -= nlinks_change; //unlinking subdir
+	parent_inode.file_links_count += nlinks_change; //unlinking subdir
 	parent_inode.file_atime = (uint64_t)unix_time;
 	parent_inode.file_mtime = (uint64_t)unix_time;
 	status = write_inode(fd, &parent_inode, sizeof(parent_inode),

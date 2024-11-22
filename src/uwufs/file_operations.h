@@ -91,8 +91,7 @@ ssize_t __remove_entry_from_dir_data_blk(int fd,
  * `nlinks_change`: change to the parent dir file links count
  * 
  * NOTE: nlinks_change should be 0 unless removing a subdir
- * and then it should be 1... may want to make this a bool?
- * (same goes for add_directory_file_entry)
+ * and then it should be -1
  */
 ssize_t unlink_file(int fd,
 					  const char *path,
