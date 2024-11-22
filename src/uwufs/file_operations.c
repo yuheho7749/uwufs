@@ -138,6 +138,7 @@ ssize_t count_directory_file_entries(int fd,
 			}		
 		}
 	}
+	// TODO: indirect blocks
 	*nentries = num_entries;
 	return 0;
 }
