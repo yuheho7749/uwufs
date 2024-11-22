@@ -101,7 +101,6 @@ ssize_t next_inode_in_path(int fd, char *file_name, struct uwufs_inode* inode,
 
 
 /**
- * TODO:
  * Find the inode of the corresponding file. If root directory inode is
  * 		valid, it will use it. Otherwise, it will read the super blk for
  * 		the root directory.

@@ -145,7 +145,6 @@ static void init_inodes(int fd,
 	
 
 /**
- * TODO:
  * TEST:
  * Make inodes a linked list for easy allocation and deallocation of
  * 		inodes.
@@ -159,7 +158,7 @@ static void init_inodes2(int fd,
 	struct uwufs_inode free_inode;
 	free_inode.file_mode = F_TYPE_FREE;
 
-	// TODO: Might want to make a inode linked list as well?
+	// NOTE: Might want to make a inode linked list as well?
 
 	uwufs_blk_t i;
 	ssize_t status;
