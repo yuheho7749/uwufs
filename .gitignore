@@ -1,3 +1,6 @@
 build/
+.vscode/
+src/uwufs/cpp/*.o
 
 email.txt
+cpp_inode_tests

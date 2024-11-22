@@ -113,4 +113,10 @@ ssize_t next_inode_in_path(int fd, char *file_name, struct uwufs_inode* inode,
 ssize_t namei(int fd, const char *path, const struct uwufs_inode *root_dir_inode, 
               uwufs_blk_t *inode_num);
 
+/**
+ * Includes the C++ implementation of the low level operations
+ * Kong
+ */
+#include "cpp/c_api.h"
+
 #endif

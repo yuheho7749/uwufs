@@ -3,11 +3,11 @@ SUBVERSION = 2
 PATCH = 22
 EXTRAVERSION = -a
 
-DEBUG = 0
+DEBUG = 1
 FUSE_USE_VERSION = 31
 
-CC = g++
-CFLAGS = -Wall
+CC = gcc
+CFLAGS = -Wall -Wno-unused
 
 ifeq ($(DEBUG), 1)
 	CFLAGS += -g -DDEBUG
@@ -15,6 +15,7 @@ endif
 
 SRC_DIR = src
 BUILD_DIR = build
+
 
 COMMON_FILES = $(SRC_DIR)/uwufs/uwufs.h $(SRC_DIR)/uwufs/low_level_operations.h $(SRC_DIR)/uwufs/low_level_operations.c $(SRC_DIR)/uwufs/file_operations.h $(SRC_DIR)/uwufs/file_operations.c
 
@@ -34,6 +35,27 @@ mount.uwu: $(COMMON_FILES) $(SRC_DIR)/uwufs/mount_uwufs.c $(SRC_DIR)/uwufs/sysca
 
 test: $(COMMON_FILES) $(SRC_DIR)/test/test.c
 	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
+
+# C++
+CXX = g++
+
+cpp_inode_tests: $(COMMON_FILES) $(SRC_DIR)/test/cpp_inode_tests.cpp
+	$(CXX) $(CFLAGS) $^ -lfuse3 -o $@
+
+CPP_SRC_DIR = $(SRC_DIR)/uwufs/cpp
+CPP_COMMON_FILES = $(CPP_SRC_DIR)/c_api.cpp $(CPP_SRC_DIR)/DataBlockIterator.cpp $(CPP_SRC_DIR)/INode.cpp
+
+$(CPP_SRC_DIR)/c_api.o: $(CPP_SRC_DIR)/c_api.cpp
+	$(CXX) $(CFLAGS) -c $< -o $@
+
+$(CPP_SRC_DIR)/DataBlockIterator.o: $(CPP_SRC_DIR)/DataBlockIterator.cpp
+	$(CXX) $(CFLAGS) -c $< -o $@
+
+$(CPP_SRC_DIR)/INode.o: $(CPP_SRC_DIR)/INode.cpp
+	$(CXX) $(CFLAGS) -c $< -o $@
+
+c_api_test: $(COMMON_FILES) $(SRC_DIR)/test/c_api_test.cpp $(CPP_SRC_DIR)/c_api.o $(CPP_SRC_DIR)/DataBlockIterator.o $(CPP_SRC_DIR)/INode.o
+	$(CXX) $(CFLAGS) $^ -lfuse3 -o $@
 
 clean:
 	rm -f $(BUILD_DIR)/*.o phase1 mkfs.uwu test mount.uwu
