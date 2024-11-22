@@ -89,7 +89,7 @@ DataBlockIterator::DataBlockIterator(const uwufs_inode* inode, int device_fd, uw
     }
     else if (start_index < INode::LEVEL_2_BLOCKS) {
         start_index -= INode::LEVEL_1_BLOCKS;
-        auto i = start_index / (INode::LEVEL_2_BLOCKS - INode::LEVEL_1_BLOCKS);
+        auto i = start_index / (INode::LEVEL_2_BLOCKS - INode::LEVEL_1_BLOCKS); // TODO: bug
         auto j = start_index % (INode::LEVEL_2_BLOCKS - INode::LEVEL_1_BLOCKS);
         itr = std::make_unique<DoubleIndirectBlockIterator>(inode->double_indirect_blks, device_fd, inode, i, j);
     }

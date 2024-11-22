@@ -23,3 +23,7 @@ void destroy_dblk_itr(dblk_itr_t itr) {
 uwufs_blk_t append_dblk(uwufs_inode* inode, int device_fd, uwufs_blk_t index, uwufs_blk_t block_no) {
     return INode::append_dblk(inode, device_fd, index, block_no);
 }
+
+uwufs_blk_t remove_dblk(uwufs_inode* inode, int device_fd, uwufs_blk_t index) {
+    return INode::remove_dblk(inode, device_fd, index);
+}

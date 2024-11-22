@@ -48,7 +48,24 @@ uwufs_blk_t dblk_itr_next(dblk_itr_t itr);
  */
 void destroy_dblk_itr(dblk_itr_t itr);
 
+/**
+ * Appends a new data block to the inode.
+ * It will write all modification directly to the disk EXCEPT the inode itself (but will modify the struct inode in memory).
+ * Remember to write the inode to disk after calling this function.
+ * It assumes `index` is the position of the new data block no.
+ * You need to make sure `index` == the last data block index + 1.
+ * Returns the block number of the new data block.
+ * Returns 0 if the operation fails.
+ */
 uwufs_blk_t append_dblk(struct uwufs_inode* inode, int device_fd, uwufs_blk_t index, uwufs_blk_t block_no);
+
+/**
+ * It will write all modification directly to the disk EXCEPT the inode itself (but will modify the struct inode in memory).
+ * It assumes `index` is the position of the data block to be removed.
+ * You need to make sure `index` == the last data block index.
+ * Returns the block number of the removed data block.
+ */
+uwufs_blk_t remove_dblk(struct uwufs_inode* inode, int device_fd, uwufs_blk_t index);
 
 #ifdef __cplusplus
 }
