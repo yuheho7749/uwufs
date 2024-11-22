@@ -103,6 +103,30 @@ ssize_t unlink_file(int fd,
 					  uwufs_blk_t inode_num,
 					  int nlinks_change);
 
+/**
+ * Frees all blk entries in an indirect block.
+ * Does not include the indirect block itself.
+ */
+ssize_t __free_indirect_blk(int fd,
+							struct uwufs_indirect_blk *indirect_blk);
+
+/**
+ * Frees all blk entries in a double indirect block recursively,
+ * including all the indirect blocks and their blk entries.
+ * Does not include the double indirect block itself.
+ */
+ssize_t __free_double_indirect_blk(int fd,
+						struct uwufs_indirect_blk *double_indirect_blk);
+
+/**
+ * Frees all blk entries in a triple indirect block recursively,
+ * including all the double and single indirect blocks and
+ * their blk entries.
+ * Does not include the triple indirect block itself.
+ */
+ssize_t __free_triple_indirect_blk(int fd,
+						struct uwufs_indirect_blk *triple_indirect_blk);
+
 ssize_t remove_file(int fd,
 					  struct uwufs_inode *inode,
 					  uwufs_blk_t inode_num);

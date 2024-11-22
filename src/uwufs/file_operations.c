@@ -367,7 +367,6 @@ found_last_entry:
 		if (status < 0)
 			goto fail_ret;
 
-
 		goto success_ret;
 	}
 fail_ret:
