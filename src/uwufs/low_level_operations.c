@@ -315,6 +315,12 @@ ssize_t namei(int fd,
 	path_segment = strtok_r(full_path, "/", &strtok_ptr);
 	while (path_segment != NULL) {
 		status = 0;
+		// check if path segment is < UWUFS_FILE_NAME_SIZE
+		if (strlen(path_segment) >= UWUFS_FILE_NAME_SIZE) {
+			printf("Path segment exceeds FILE_NAME_SIZE\n");
+			return -ENAMETOOLONG;
+		}
+
 		// regular file
 		if ((current_inode.file_mode & F_TYPE_BITS) == F_TYPE_REGULAR) {
 			path_segment = strtok_r(NULL, "/", &strtok_ptr);
