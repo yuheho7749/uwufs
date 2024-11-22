@@ -30,12 +30,13 @@ void* uwufs_init(struct fuse_conn_info *conn,
 	return NULL;
 }
 
-// TODO:
 int uwufs_getattr(const char *path,
 				  struct stat *stbuf,
 				  struct fuse_file_info *fi)
 {
 	(void) fi;
+
+	// TODO: Check file permissions
 
 	uwufs_blk_t inode_num;
 	ssize_t status = namei(device_fd, path, NULL, &inode_num);
@@ -81,7 +82,6 @@ int uwufs_mknod(const char *path, mode_t mode, dev_t device)
 	return -ENOENT;
 }
 
-// TODO: 
 // 1) namei() with the path up to the directory to be created
 // return if namei errors or the lead-up path isn't found
 // 2) find_free_inode() to get the inode to use 
@@ -249,13 +249,8 @@ int uwufs_rmdir(const char *path)
 
 	// TODO: check permissions to see if user allowed to rmdir
 
-	// check that there are only 2 entries in dir
-	// could also explicitly check for '.' and '..' only
-	int num_dir_entries = 0;
-	status = count_directory_file_entries(device_fd, 
-										  &child_dir_inode, &num_dir_entries);
-	RETURN_IF_ERROR(status);
-	if (num_dir_entries > 2)
+	// check if dir empty (assume entries are semi packed - see is_directory_empty)
+	if (!is_directory_empty(device_fd, &child_dir_inode))
 		return -ENOTEMPTY;
 
 	// check only 2 links as well
@@ -355,39 +350,41 @@ int uwufs_readdir(const char *path,
 	if (status < 0)
 		return -ENOENT;
 
-	uint16_t aflags = inode.file_mode;
-	if (F_TYPE_DIRECTORY != (aflags & F_TYPE_BITS))
+	uint16_t f_mode = inode.file_mode;
+	if (F_TYPE_DIRECTORY != (f_mode & F_TYPE_BITS))
 		return -ENOTDIR;
 
 	// TODO: Don't worry about permission bits yet (but still show it)
 
-
-	// Read each direct data blk and add to filler
-	int dir_blk_num = 0;
-	int total_direct_blks = (inode.file_size + UWUFS_BLOCK_SIZE - 1) /
+	dblk_itr_t dblk_itr = create_dblk_itr(&inode, device_fd, 0);
+	// Read each data blk and add to filler
+	uwufs_blk_t dir_data_blk_num;
+	int total_blks = (inode.file_size + UWUFS_BLOCK_SIZE - 1) /
 							 UWUFS_BLOCK_SIZE;
 	struct uwufs_directory_data_blk dir_data_blk;
-
-	// Loop through all direct block and fetch it one by one
-	while (dir_blk_num < UWUFS_DIRECT_BLOCKS &&
-		   dir_blk_num < total_direct_blks)
-	{
-		status = read_blk(device_fd, &dir_data_blk,
-					inode.direct_blks[dir_blk_num]);
-		if (status < 0)
+	int i;
+	for (i = 0; i < total_blks; i++) {
+		dir_data_blk_num = dblk_itr_next(dblk_itr);
+		if (dir_data_blk_num == 0) { // Shouldn't happen
+			destroy_dblk_itr(dblk_itr);
 			return -EIO;
+		}
 
-		// At this point I have the dir data block
+		status = read_blk(device_fd, &dir_data_blk, dir_data_blk_num);
+		if (status < 0) {
+			destroy_dblk_itr(dblk_itr);
+			return -EIO;
+		}
+
 		status = __uwufs_helper_readdir_blk(dir_data_blk, buf, filler);
-		if (status == 1)
+		if (status == 1) {
 			// If buf is full, filler/helper will return 1
 			// return error or just not include the rest?
+			destroy_dblk_itr(dblk_itr);
 			return 0;
-
-		dir_blk_num ++;
+		}
 	}
-	// TODO: Dont' worry about indirects yet
-
+	destroy_dblk_itr(dblk_itr);
 	return 0;
 }
 

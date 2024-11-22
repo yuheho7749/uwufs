@@ -9,6 +9,7 @@
 
 #include "uwufs.h"
 #include <stdlib.h>
+#include <stdbool.h>
 
 // NOTE: Not Implemented yet (feel free to change function signature)
 // 		(see syscall.c `__create_regular_file` for a similar function)
@@ -43,8 +44,6 @@ ssize_t put_directory_file_entry(struct uwufs_directory_data_blk *dir_blk,
  *
  * Return: 0 on success or -ENOSPC if the directory is full/no more
  * 		space on storage device (no more blocks can be allocated)
- *
- * TODO: Indirect blks; currently only checks/allocates direct blks
  * 
  * Parameters:
  * `fd`: block device
@@ -60,6 +59,7 @@ ssize_t add_directory_file_entry(int fd,
 								 int nlinks_change);
 
 /** 
+ * NOTE: Deprecated (or needs to be updated for indirect blocks)
  * Counts and stores the # of entries in the directory
  * in `nentries`
  * 
@@ -72,14 +72,18 @@ ssize_t count_directory_file_entries(int fd,
 								 	 struct uwufs_inode *dir_inode,
 								 	 int *nentries);
 
+bool is_directory_empty(int fd, struct uwufs_inode *dir_inode);
+
 ssize_t split_path_parent_child(const char *path,
 								char *parent_path,
 								char *child_dir);
 
 ssize_t __remove_entry_from_dir_data_blk(int fd,
-										 uwufs_blk_t dir_data_blk_num,
-										 const char name[UWUFS_FILE_NAME_SIZE],
-										 uwufs_blk_t file_inode_num);
+						 struct uwufs_directory_data_blk *dir_data_blk,
+						 struct uwufs_directory_data_blk *last_dir_data_blk,
+						 int last_file_entry_index,
+						 const char name[UWUFS_FILE_NAME_SIZE],
+						 uwufs_blk_t file_inode_num);
 /**
  * Removes a file entry in its parent directory
  * 

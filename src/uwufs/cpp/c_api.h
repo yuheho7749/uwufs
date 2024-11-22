@@ -48,6 +48,11 @@ uwufs_blk_t dblk_itr_next(dblk_itr_t itr);
  */
 void destroy_dblk_itr(dblk_itr_t itr);
 
+/**
+ * Assumes caller has called malloc_blk and is passing a new block to append
+ *
+ * Return: the blk number of the data block appended or 0 if unsuccessful
+ */
 uwufs_blk_t append_dblk(struct uwufs_inode* inode, int device_fd, uwufs_blk_t index, uwufs_blk_t block_no);
 
 #ifdef __cplusplus

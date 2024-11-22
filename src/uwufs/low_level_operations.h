@@ -93,8 +93,6 @@ ssize_t find_free_inode(int fd, uwufs_blk_t *inode_num);
  * `file_name`: the file of which to find the next inode for
  * `inode`: the inode to search in 
  * `inode_num`: where to save the next inode number if found 
- * 
- * TODO: only scans direct blks for now
  */
 ssize_t next_inode_in_path(int fd, char *file_name, struct uwufs_inode* inode,
                            uwufs_blk_t *inode_num);

@@ -1,12 +1,12 @@
 VERSION = 0
 SUBVERSION = 2
-PATCH = 22
+PATCH = 27
 EXTRAVERSION = -a
 
-DEBUG = 1
+DEBUG = 0
 FUSE_USE_VERSION = 31
 
-CC = gcc
+CC = g++
 CFLAGS = -Wall -Wno-unused
 
 ifeq ($(DEBUG), 1)
@@ -17,7 +17,7 @@ SRC_DIR = src
 BUILD_DIR = build
 
 
-COMMON_FILES = $(SRC_DIR)/uwufs/uwufs.h $(SRC_DIR)/uwufs/low_level_operations.h $(SRC_DIR)/uwufs/low_level_operations.c $(SRC_DIR)/uwufs/file_operations.h $(SRC_DIR)/uwufs/file_operations.c
+COMMON_FILES = $(SRC_DIR)/uwufs/uwufs.h $(SRC_DIR)/uwufs/low_level_operations.h $(SRC_DIR)/uwufs/low_level_operations.c $(SRC_DIR)/uwufs/file_operations.h $(SRC_DIR)/uwufs/file_operations.c $(SRC_DIR)/uwufs/cpp/*
 
 all: $(BUILD_DIR) mkfs.uwu mount.uwu test
 

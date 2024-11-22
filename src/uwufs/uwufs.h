@@ -101,6 +101,10 @@ struct __attribute__((__packed__)) uwufs_directory_data_blk {
 		UWUFS_BLOCK_SIZE/sizeof(struct uwufs_directory_file_entry)];
 };
 
+struct __attribute__((__packed__)) uwufs_indirect_blk {
+	uwufs_blk_t entries[UWUFS_BLOCK_SIZE / sizeof(uwufs_blk_t)];
+};
+
 struct __attribute__((__packed__)) uwufs_regular_file_data_blk {
 	char data[UWUFS_BLOCK_SIZE];
 };

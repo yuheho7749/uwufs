@@ -26,7 +26,7 @@
 /**
  * Creates a linked list structure for the freelist
  * 
- * TODO:
+ * NOTE:
  * Need to use a more efficient method of storing a freelist
  */
 static uwufs_blk_t init_freelist(int fd,
@@ -187,11 +187,6 @@ static void init_root_directory(int fd)
 	memset(&root_inode, 0, sizeof(root_inode));
 	ssize_t status;
 	time_t unix_time;
-
-	// TODO: Abstract this to add_directory_file_entry (which is
-	// 		different from create_directory_file_entry)
-	// 		add_directory_file_entry should do the malloc_blk if
-	// 		there is no additional space in its allocated data blks
 	
 	// Add . and .. entry
 	struct uwufs_directory_data_blk dir_blk;
@@ -292,48 +287,48 @@ static int init_uwufs(int fd,
 	return 0;
 }
 
-// int main(int argc, char *argv[])
-// {
-// 	if (argc < 2) {
-// 		printf("Usage: %s [block device]\n", argv[0]);
-// 		return 1;
-// 	}
+int main(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Usage: %s [block device]\n", argv[0]);
+		return 1;
+	}
 
-// 	int fd = open(argv[1], O_RDWR);
-// 	if (fd < 0) {
-// 		perror("Failed to access block device");
-// 		return 1;
-// 	}
-	
-// 	int ret = 0;
+	int fd = open(argv[1], O_RDWR);
+	if (fd < 0) {
+		perror("Failed to access block device");
+		return 1;
+	}
+ 
+	int ret = 0;
 
-// 	// Get and check size of block device
-// 	uwufs_blk_t blk_dev_size;
+	// Get and check size of block device
+	uwufs_blk_t blk_dev_size;
 
-// #ifdef __linux__
-// 	// BLKGETSIZE64 assumes linux system
-// 	ret = ioctl(fd, BLKGETSIZE64, &blk_dev_size);
-// #else
-// 	perror("Unsupported operating system: not Linux");
-// 	close(fd);
-// 	return 1;
-// #endif
-// 	if (ret < 0) {
-// 		perror("Not a block device/partition or cannot determine its size");
-// 		close(fd);
-// 		return 1;
-// 	}
-// #ifdef DEBUG
-// 	printf("Block device %s size : %ld (%ld blocks)\n", argv[1],
-// 		blk_dev_size, blk_dev_size/UWUFS_BLOCK_SIZE);
-// #endif
+#ifdef __linux__
+	// BLKGETSIZE64 assumes linux system
+	ret = ioctl(fd, BLKGETSIZE64, &blk_dev_size);
+#else
+	perror("Unsupported operating system: not Linux");
+	close(fd);
+	return 1;
+#endif
+	if (ret < 0) {
+		perror("Not a block device/partition or cannot determine its size");
+		close(fd);
+		return 1;
+	}
+#ifdef DEBUG
+	printf("Block device %s size : %ld (%ld blocks)\n", argv[1],
+		blk_dev_size, blk_dev_size/UWUFS_BLOCK_SIZE);
+#endif
 
-// 	// NOTE: Read user definable params later.
-// 	// 	Specifing blk_dev_size to format can help with testing too
-// 	ret = init_uwufs(fd, blk_dev_size/UWUFS_BLOCK_SIZE, UWUFS_RESERVED_SPACE,
-// 				  	 UWUFS_ILIST_DEFAULT_PERCENTAGE);
+	// NOTE: Read user definable params later.
+	// 	Specifing blk_dev_size to format can help with testing too
+	ret = init_uwufs(fd, blk_dev_size/UWUFS_BLOCK_SIZE, UWUFS_RESERVED_SPACE,
+				  	 UWUFS_ILIST_DEFAULT_PERCENTAGE);
 
-// 	printf("Done formating device %s\n", argv[1]);
-// 	close(fd);
-// 	return ret;
-// }
+	printf("Done formating device %s\n", argv[1]);
+	close(fd);
+	return ret;
+}

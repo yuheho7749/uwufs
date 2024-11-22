@@ -12,6 +12,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include "cpp/c_api.h"
+
 ssize_t read_blk(int fd, void* buf, uwufs_blk_t blk_num)
 {
 	ssize_t status = lseek(fd, blk_num * UWUFS_BLOCK_SIZE, SEEK_SET);
@@ -245,22 +247,25 @@ ssize_t next_inode_in_path(int fd,
 						   uwufs_blk_t *inode_num) {
 
 	struct uwufs_directory_data_blk dir_data_blk;
+	uwufs_blk_t dir_data_blk_num;
 	ssize_t status;
 	int num_entries = UWUFS_BLOCK_SIZE / sizeof(struct uwufs_directory_file_entry);
+	int n = (cur_inode->file_size + UWUFS_BLOCK_SIZE - 1) / UWUFS_BLOCK_SIZE;
 
-	// scan each direct block 
-	for (int i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
-		// TEMP: Should actually check that the direct blks point to
-		// 		blks after ilist (but that requires info from super blk
-		if (cur_inode->direct_blks[i] <= 1 + UWUFS_RESERVED_SPACE) {
-			continue;
+	dblk_itr_t dblk_itr = create_dblk_itr(cur_inode, fd, 0);
+
+	int i, j;
+	for (i = 0; i < n; i++) {
+		dir_data_blk_num = dblk_itr_next(dblk_itr);
+		if (dir_data_blk_num == 0) {
+			status = -EIO;
+			goto debug_msg_ret;
 		}
-		status = read_blk(fd, &dir_data_blk, cur_inode->direct_blks[i]);
+		status = read_blk(fd, &dir_data_blk, dir_data_blk_num);
 		if (status < 0) 
 			goto debug_msg_ret;
-		
-		// compare each entry in the block
-		for (int j = 0; j < num_entries; j++) {
+
+		for (j = 0; j < num_entries; j++) {
 			if (dir_data_blk.file_entries[j].inode_num <= 0) {
 				continue;
 			}
@@ -271,14 +276,16 @@ ssize_t next_inode_in_path(int fd,
 				// printf("\t\tResolved %s with inode number %lu\n", file_name,
 				// 	dir_data_blk.file_entries[j].inode_num);
 #endif
+				destroy_dblk_itr(dblk_itr);
 				return 0;
 			}
 		}
 	}
-
+	destroy_dblk_itr(dblk_itr);
 	return -ENOENT; //not found
 
 debug_msg_ret:
+	destroy_dblk_itr(dblk_itr);
 #ifdef DEBUG
 	perror("search_for_next_inode error");
 #endif
