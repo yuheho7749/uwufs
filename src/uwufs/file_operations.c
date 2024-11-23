@@ -273,7 +273,6 @@ found_entry_ret:
 		memset(&(last_dir_data_blk->file_entries[last_file_entry_index]),
 			 0, sizeof(file_entry));
 	}
-
 	// 0 or positive when successful - can be used to tell if last dir
 	// is empty assuming the last_file_entry_index is scanned in reverse
 	// by the caller of this function
@@ -330,10 +329,12 @@ ssize_t unlink_file(int fd,
 	status = read_blk(fd, &last_dir_data_blk, last_dblk_num);
 	if (status < 0) return status;
 	for (last_file_entry_index = num_file_entries - 1;
-		last_file_entry_index >=0;
+		last_file_entry_index >= 0;
 		last_file_entry_index--) {
 		last_dir_entry_inode_num = last_dir_data_blk.file_entries[last_file_entry_index].inode_num;
-		if (last_dir_entry_inode_num != 0) {
+		printf("last_file_entry_index %d\n", last_file_entry_index);
+		printf("last_dir_entry_inode_num %lu\n", last_dir_entry_inode_num);
+		if (last_dir_entry_inode_num > 0) {
 			goto found_last_entry;
 		}
 	}
@@ -353,6 +354,7 @@ found_last_entry:
 		if (status < 0)
 			goto fail_ret;
 
+		printf("last_file_entry_index: %d\n", last_file_entry_index);
 		// this looks bad, but compiler will optimizes it :)
 		if (last_dblk_num == dir_data_blk_num) {
 			status = __remove_entry_from_dir_data_blk(fd,
@@ -370,6 +372,8 @@ found_last_entry:
 												inode_num);
 		}
 
+		printf("unlink_file 2\n");
+		printf("remove entry status %ld\n", status);
 		if (status == -ENOENT)
 			continue;
 		if (status < 0)
@@ -377,19 +381,32 @@ found_last_entry:
 
 		// last file entry index is 0 so the last blk is empty
 		if (status == 0) {
+			printf("free blk\n");
 			last_dblk_index = remove_dblk(&parent_inode, fd, num_data_blks - 1);
+<<<<<<< HEAD
 			if (last_dblk_index != last_dblk_num) {
 				printf("debug1\n");
+=======
+			printf("last_dblk_index %lu\n", last_dblk_index);
+			printf("num_data_blks %lu\n", num_data_blks);
+			printf("last_dblk_num %lu\n", last_dblk_num);
+			for (int t = 0; t < 10; t++) {
+				printf("t: %lu", parent_inode.direct_blks[t]);
+			}
+			if (last_dblk_index != last_dblk_num) {
+>>>>>>> 255bd9059dbc0de2fad7706323fb95d0c5b6d748
 				status = -EIO;
 				goto fail_ret;
 			}
 			parent_inode.file_size -= UWUFS_BLOCK_SIZE;
 			parent_inode.file_ctime = (uint64_t)unix_time;
 		} else {
+			printf("just remove entry\n");
 			status = write_blk(fd, &last_dir_data_blk, last_dblk_num);
 			if (status < 0) goto fail_ret;
 		}
 
+		printf("unlink_file 3\n");
 		status = write_blk(fd, &dir_data_blk, dir_data_blk_num);
 		if (status < 0)
 			goto fail_ret;
