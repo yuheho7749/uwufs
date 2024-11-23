@@ -59,6 +59,7 @@ ssize_t add_directory_file_entry(int fd,
 	time_t unix_time;
 	struct uwufs_directory_data_blk dir_data_blk;
 	uwufs_blk_t dir_data_blk_num;
+	bool has_malloc = false;
 
 	unix_time = time(NULL);
 	if (unix_time == -1)
@@ -78,7 +79,8 @@ ssize_t add_directory_file_entry(int fd,
 		status = malloc_blk(fd, &dir_data_blk_num);
 		if (status < 0 || dir_data_blk_num <= 0)
 			return -ENOSPC;
-
+		
+		has_malloc = true;
 		dir_inode.direct_blks[0] = dir_data_blk_num;
 		dir_inode.file_size += UWUFS_BLOCK_SIZE;
 		dir_inode.file_ctime = (uint64_t)unix_time;
@@ -92,26 +94,34 @@ ssize_t add_directory_file_entry(int fd,
 	}
 
 	status = read_blk(fd, &dir_data_blk, dir_data_blk_num);
-	RETURN_IF_ERROR(status);
+	if (status < 0)
+		goto error_ret;
+	// RETURN_IF_ERROR(status);
 
 	status = put_directory_file_entry(&dir_data_blk, name, file_inode_num);
 	if (status == -ENOSPC) {
 		status = malloc_blk(fd, &dir_data_blk_num);
-		if (status < 0 || dir_data_blk_num <= 0)
-			return -ENOSPC;
+		if (status < 0 || dir_data_blk_num <= 0) {
+			status = -ENOSPC;
+			goto error_ret;
+		}
+
 		dir_inode.file_size += UWUFS_BLOCK_SIZE;
 		dir_inode.file_ctime = (uint64_t)unix_time;
 
 		memset(&dir_data_blk, 0, sizeof(dir_data_blk));
 		status = put_directory_file_entry(&dir_data_blk, name, file_inode_num);
-		if (status < 0) return status;
+		if (status < 0) {
+			free_blk(fd, dir_data_blk_num);
+			return status;
+		}
 		uwufs_blk_t dir_data_blk_num2 = append_dblk(&dir_inode, fd, n,
 										  dir_data_blk_num);
 #ifdef DEBUG
 		assert(dir_data_blk_num2 == dir_data_blk_num);
 #endif
 	} else if (status < 0) {
-		return status;
+		goto error_ret;
 	}
 
 	// Entry add success and return
@@ -122,11 +132,20 @@ ssize_t add_directory_file_entry(int fd,
 	dir_inode.file_atime = (uint64_t)unix_time;
 
 	status = write_inode(fd, &dir_inode, sizeof(dir_inode), dir_inode_num);
-	RETURN_IF_ERROR(status);
+	// RETURN_IF_ERROR(status);
+	if (status < 0)
+		goto error_ret;
 
 	status = write_blk(fd, &dir_data_blk, dir_data_blk_num);
-	RETURN_IF_ERROR(status);
+	// RETURN_IF_ERROR(status);
+	if (status < 0)
+		goto error_ret;
 	return 0;
+
+error_ret:
+	if (has_malloc)
+		free_blk(fd, dir_data_blk_num);
+	return status;
 }
 
 // NOTE: Deprecated (need to handle indirect blocks)
@@ -239,14 +258,20 @@ ssize_t __remove_entry_from_dir_data_blk(int fd,
 	return -ENOENT;
 
 found_entry_ret:
-	if (last_dir_data_blk != NULL) { // move the last entry to replace the one removed
+	if (last_dir_data_blk == NULL && i == last_file_entry_index) {
+		memset(&dir_data_blk->file_entries[i], 0, sizeof(file_entry));
+	} else if (last_dir_data_blk == NULL) {
+		memcpy(&dir_data_blk->file_entries[i],
+			 &(dir_data_blk->file_entries[last_file_entry_index]),
+			 sizeof(file_entry));
+		memset(&(dir_data_blk->file_entries[last_file_entry_index]),
+			 0, sizeof(file_entry));
+	} else {
 		memcpy(&dir_data_blk->file_entries[i],
 			 &(last_dir_data_blk->file_entries[last_file_entry_index]),
 			 sizeof(file_entry));
 		memset(&(last_dir_data_blk->file_entries[last_file_entry_index]),
 			 0, sizeof(file_entry));
-	} else {
-		memset(&dir_data_blk->file_entries[i], 0, sizeof(file_entry));
 	}
 
 	// 0 or positive when successful - can be used to tell if last dir
@@ -353,7 +378,8 @@ found_last_entry:
 		// last file entry index is 0 so the last blk is empty
 		if (status == 0) {
 			last_dblk_index = remove_dblk(&parent_inode, fd, num_data_blks - 1);
-			if (last_dblk_index != num_data_blks - 1) {
+			if (last_dblk_index != last_dblk_num) {
+				printf("debug1\n");
 				status = -EIO;
 				goto fail_ret;
 			}

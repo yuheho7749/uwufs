@@ -97,6 +97,15 @@ int uwufs_mkdir(const char *path,
 	// get the uid etc of the user
 	struct fuse_context *fuse_ctx = fuse_get_context();
 
+	// struct uwufs_super_blk super_blk;
+	// status = read_blk(device_fd, &super_blk, 0);
+	// if (status < 0)
+	// 	return status;
+	//
+	// if (super_blk.free_inodes_left == 0) {
+	// 	return -ENOSPC;
+	// }
+
 	// printf("original path %s", path);
 	// split path into parent + child parts
 	char parent_path[strlen(path)+1];
@@ -123,28 +132,44 @@ int uwufs_mkdir(const char *path,
 	status = find_free_inode(device_fd, &child_dir_inode_num);
 	RETURN_IF_ERROR(status);
 
-	// update the parent data blk 
-	status = add_directory_file_entry(device_fd, parent_dir_inode_num,
-						child_dir, child_dir_inode_num, 1);
-	RETURN_IF_ERROR(status);
-
-	// new child dir: populate . and .. entry
-	struct uwufs_directory_data_blk new_dir_blk;
-	memset(&new_dir_blk, 0, sizeof(new_dir_blk));
-	status = put_directory_file_entry(&new_dir_blk, ".", child_dir_inode_num);
-	RETURN_IF_ERROR(status);
-	status = put_directory_file_entry(&new_dir_blk, "..", parent_dir_inode_num);
-	RETURN_IF_ERROR(status);
-
 	// allocate a new data blk
 	uwufs_blk_t new_blk_num;
 	status = malloc_blk(device_fd, &new_blk_num);
 	if (status < 0 || new_blk_num <= 0)
 		return status;
 
+	// update the parent data blk 
+	status = add_directory_file_entry(device_fd, parent_dir_inode_num,
+						child_dir, child_dir_inode_num, 1);
+	if (status < 0) {
+		free_blk(device_fd, new_blk_num);
+		return status;
+	}
+	// RETURN_IF_ERROR(status);
+
+	// new child dir: populate . and .. entry
+	struct uwufs_directory_data_blk new_dir_blk;
+	memset(&new_dir_blk, 0, sizeof(new_dir_blk));
+	status = put_directory_file_entry(&new_dir_blk, ".", child_dir_inode_num);
+	if (status < 0) {
+		free_blk(device_fd, new_blk_num);
+		return status;
+	}
+	// RETURN_IF_ERROR(status);
+	status = put_directory_file_entry(&new_dir_blk, "..", parent_dir_inode_num);
+	if (status < 0) {
+		free_blk(device_fd, new_blk_num);
+		return status;
+	}
+	// RETURN_IF_ERROR(status);
+
 	// Write entries to actual data block
 	status = write_blk(device_fd, &new_dir_blk, new_blk_num);
-	RETURN_IF_ERROR(status);
+	// RETURN_IF_ERROR(status);
+	if (status < 0) {
+		free_blk(device_fd, new_blk_num);
+		return status;
+	}
 
 	// TODO: add other permissions, metadata, etc
 	struct uwufs_inode new_inode;
@@ -165,8 +190,16 @@ int uwufs_mkdir(const char *path,
 	// write new dir inode
 	status = write_inode(device_fd, &new_inode, sizeof(new_inode),
 						 child_dir_inode_num);
-	RETURN_IF_ERROR(status);
+	// RETURN_IF_ERROR(status);
+	if (status < 0) {
+		free_blk(device_fd, new_blk_num);
+		return status;
+	}
 	
+	// super_blk.free_inodes_left -= 1;
+	// status = write_blk(device_fd, &super_blk, 0);
+	// if (status < 0)
+	// 	return -EIO;
 	return 0;
 }
 
@@ -412,6 +445,15 @@ int __create_regular_file(const char *path,
 		unix_time = 0;
 
 	ssize_t status;
+	// struct uwufs_super_blk super_blk;
+	// status = read_blk(device_fd, &super_blk, 0);
+	// if (status < 0)
+	// 	return status;
+	//
+	// if (super_blk.free_inodes_left == 0) {
+	// 	return -ENOSPC;
+	// }
+
 	status = split_path_parent_child(path, parent_path, child_path);
 	if (status < 0)
 		return status;
@@ -421,14 +463,22 @@ int __create_regular_file(const char *path,
 #ifdef DEBUG
 		printf("__create_regular_file: creating new file\n");
 #endif
+		printf("debug 1\n");
 		// Find parent inode
 		status = namei(device_fd, parent_path, NULL, &parent_dir_inode_num);
 		if (status < 0)
 			return -ENOENT;
 
+		printf("debug 2\n");
 		// Get new empty inode
 		status = find_free_inode(device_fd, &child_file_inode_num);
 		RETURN_IF_ERROR(status);
+
+		printf("debug 3\n");
+
+		// // very conservative with space left
+		// if (super_blk.free_blks_left < 4)
+		// 	return -ENOSPC;
 
 		// Add child file entry to parent dir
 		status = add_directory_file_entry(device_fd, parent_dir_inode_num,
@@ -446,6 +496,7 @@ int __create_regular_file(const char *path,
 		child_file_inode.file_ctime = (uint64_t)unix_time;
 		child_file_inode.file_mtime = (uint64_t)unix_time;
 
+		printf("debug 4\n");
 		goto success_ret;
 	} else if (file_exists_status < 0) {
 		return file_exists_status;
@@ -454,12 +505,17 @@ int __create_regular_file(const char *path,
 	printf("create_regular_file: file already exists");
 #endif
 success_ret:
+	printf("debug 5\n");
 	child_file_inode.file_atime = (uint64_t)unix_time;
 	status = write_inode(device_fd, &child_file_inode,
 				   sizeof(child_file_inode), child_file_inode_num);
 	if (status < 0)
 		return -EIO;
 
+	// super_blk.free_inodes_left -= 1;
+	// status = write_blk(device_fd, &super_blk, 0);
+	// if (status < 0)
+	// 	return -EIO;
 	return 0;
 }
 

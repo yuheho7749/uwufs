@@ -127,6 +127,9 @@ ssize_t malloc_blk(int fd, uwufs_blk_t *blk_num)
 	if (status < 0)
 		goto debug_msg_ret;
 
+	if (super_blk.free_blks_left == 0)
+		return -ENOSPC;
+
 	freelist_head = super_blk.freelist_head;
 
 	if (freelist_head <= 0)
@@ -138,6 +141,7 @@ ssize_t malloc_blk(int fd, uwufs_blk_t *blk_num)
 		goto debug_msg_ret;
 
 	super_blk.freelist_head = free_blk.next_free_blk;
+	super_blk.free_blks_left -= 1;
 	status = write_blk(fd, &super_blk, 0);
 	if (status < 0)
 		goto debug_msg_ret;
@@ -163,6 +167,7 @@ ssize_t free_blk(int fd, const uwufs_blk_t blk_num)
 
 	new_freelist_head.next_free_blk = super_blk.freelist_head;
 	super_blk.freelist_head = blk_num;
+	super_blk.free_blks_left += 1;
 
 	status = write_blk(fd, &new_freelist_head, blk_num);
 	if (status < 0)
@@ -191,9 +196,11 @@ ssize_t find_free_inode(int fd, uwufs_blk_t *inode_num) {
 	// read superblk for ilist start & size
 	struct uwufs_super_blk super_blk;
 	ssize_t status = read_blk(fd, &super_blk, 0);
-	
 	if (status < 0)
 		goto debug_msg_ret;
+
+	// if (super_blk.free_inodes_left == 0)
+	// 	return -ENOSPC;
 	current_inode_blk = super_blk.ilist_start;
 
     // read one inode block at a time 

@@ -63,8 +63,10 @@ struct __attribute__((__packed__)) uwufs_super_blk {
 	uwufs_blk_t freelist_start;
 	uwufs_blk_t freelist_total_size;
 	uwufs_blk_t freelist_head;
+	uwufs_blk_t free_inodes_left;
+	uwufs_blk_t free_blks_left;
 
-	char padding[UWUFS_BLOCK_SIZE - (6 * sizeof(uwufs_blk_t))];
+	char padding[UWUFS_BLOCK_SIZE - (8 * sizeof(uwufs_blk_t))];
 };
 
 // 256 bytes for larger {a,m,c}times etc
