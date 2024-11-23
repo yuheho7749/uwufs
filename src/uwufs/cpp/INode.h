@@ -2,6 +2,7 @@
 #define INode_h
 
 #include "../uwufs.h"
+#include <utility>  // std::pair
 
 
 class DataBlockIterator;    // forward declaration
@@ -43,9 +44,11 @@ public:
     static uwufs_blk_t static_get_dblk(const uwufs_inode* inode, int device_fd, uwufs_blk_t index);
     static DataBlockIterator static_dblk_itr(const uwufs_inode* inode, int device_fd, uwufs_blk_t start_index);
     static uwufs_blk_t append_dblk(uwufs_inode* inode, int device_fd, uwufs_blk_t index, uwufs_blk_t block_no);
+    static uwufs_blk_t remove_dblk(uwufs_inode* inode, int device_fd, uwufs_blk_t index);
 
 private:
     static uwufs_blk_t recursive_append_dblk(int device_fd, uint8_t level, uwufs_blk_t cur_no, uwufs_blk_t index, uwufs_blk_t block_no);
+    static std::pair<uwufs_blk_t, bool> recursive_remove_dblk(int device_fd, uint8_t level, uwufs_blk_t cur_no, uwufs_blk_t index);
 };
 
 

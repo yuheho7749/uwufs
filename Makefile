@@ -40,7 +40,7 @@ test: $(COMMON_FILES) $(SRC_DIR)/test/test.c $(CPP_DEPENDENCIES)
 	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
 
 # C++
-CXX = g++
+CXX = g++ -std=c++17
 
 cpp_inode_tests: $(COMMON_FILES) $(SRC_DIR)/test/cpp_inode_tests.cpp
 	$(CXX) $(CFLAGS) $^ -lfuse3 -o $@
