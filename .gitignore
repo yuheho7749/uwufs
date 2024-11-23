@@ -4,3 +4,4 @@ src/uwufs/cpp/*.o
 
 email.txt
 cpp_inode_tests
+c_api_test
