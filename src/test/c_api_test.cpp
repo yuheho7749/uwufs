@@ -20,7 +20,7 @@ int main() {
     for (uwufs_blk_t i = 0; i < 300000; ++i) {
         uwufs_blk_t blk_no = i + 1;
         append_dblk(&inode, fd, i, blk_no);
-        printf("blk_no: %lu\n", blk_no);
+        // printf("i = %lu\n", i);
         if (get_dblk(&inode, fd, i) != blk_no) {
             printf("append_dblk or get_dblk failed\n");
             return 1;

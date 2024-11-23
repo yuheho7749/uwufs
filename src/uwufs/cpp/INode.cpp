@@ -123,6 +123,7 @@ std::pair<uwufs_blk_t, bool> INode::recursive_remove_dblk(int device_fd, uint8_t
             return {0, false};
         }
     }
+	// XXX: erase entry here?
     return {block_no, false};
 }
 
