@@ -109,6 +109,25 @@ int main(int argc, char* argv[]) {
 		printf("\t%lu\t%s\n", dir_data_blk.file_entries[i].inode_num,
 		 	   dir_data_blk.file_entries[i].file_name);
 	}
+	status = read_blk(fd, &dir_data_blk, root_directory_inode.direct_blks[1]);
+	if (status < 0) {
+		perror("Failed to read first data blk of root dir");
+		close(fd);
+		exit(1);
+	}
+	printf("Root Directory Direct Block Numbers (all blocks)\n");
+	for (i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
+		printf("Direct block %lu: %lu\n", i, root_directory_inode.direct_blks[i]);
+	}
+
+	printf("Root Directory Entries (second block):\n");
+	for (i = 0; i < UWUFS_BLOCK_SIZE/sizeof(struct uwufs_directory_file_entry); i ++) {
+		if (dir_data_blk.file_entries[i].inode_num <= 0) {
+			continue;
+		}
+		printf("\t%lu\t%s\n", dir_data_blk.file_entries[i].inode_num,
+		 	   dir_data_blk.file_entries[i].file_name);
+	}
 
 	// ----- Read freelist head using super blk info -----
 	struct uwufs_free_data_blk free_blk;

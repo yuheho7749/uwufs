@@ -325,8 +325,13 @@ int main(int argc, char *argv[])
 
 	// NOTE: Read user definable params later.
 	// 	Specifing blk_dev_size to format can help with testing too
+#ifdef DEBUG
+	ret = init_uwufs(fd, 10000, UWUFS_RESERVED_SPACE,
+				  	 UWUFS_ILIST_DEFAULT_PERCENTAGE);
+#else
 	ret = init_uwufs(fd, blk_dev_size/UWUFS_BLOCK_SIZE, UWUFS_RESERVED_SPACE,
 				  	 UWUFS_ILIST_DEFAULT_PERCENTAGE);
+#endif
 
 	printf("Done formating device %s\n", argv[1]);
 	close(fd);

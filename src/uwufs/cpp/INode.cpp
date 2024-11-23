@@ -97,6 +97,7 @@ std::pair<uwufs_blk_t, bool> INode::recursive_remove_dblk(int device_fd, uint8_t
 #endif
             return {block_no, true};
         }
+		// XXX: erase entry here?
         return {block_no, false};
     }
     uwufs_blk_t mod = 1;
@@ -113,6 +114,7 @@ std::pair<uwufs_blk_t, bool> INode::recursive_remove_dblk(int device_fd, uint8_t
 #endif
         return {block_no, true};
     }
+	// XXX: erase entry here?
     return {block_no, false};
 }
 
@@ -126,6 +128,7 @@ uwufs_blk_t INode::remove_dblk(uwufs_inode *inode, int device_fd, uwufs_blk_t in
         return 0;
     }
     if (index < LEVEL_0_BLOCKS) {   // direct block
+		// XXX: erase entry here too?
         return inode->direct_blks[index];
     }
     if (index < LEVEL_1_BLOCKS) {  // single indirect block
