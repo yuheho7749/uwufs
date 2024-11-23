@@ -272,6 +272,7 @@ ssize_t unlink_file(int fd,
 	char child_path[UWUFS_FILE_NAME_SIZE];
 	uwufs_blk_t i;
 	uwufs_blk_t last_dblk_num;
+	uwufs_blk_t last_dblk_index;
 	struct uwufs_directory_data_blk dir_data_blk;
 	uwufs_blk_t dir_data_blk_num;
 	struct uwufs_directory_data_blk last_dir_data_blk;
@@ -327,6 +328,7 @@ found_last_entry:
 		if (status < 0)
 			goto fail_ret;
 
+		// this looks bad, but compiler will optimizes it :)
 		if (last_dblk_num == dir_data_blk_num) {
 			status = __remove_entry_from_dir_data_blk(fd,
 												&dir_data_blk,
@@ -350,13 +352,12 @@ found_last_entry:
 
 		// last file entry index is 0 so the last blk is empty
 		if (status == 0) {
-			// TODO: (waiting) free last block including indirects
-			// status = free_blk(fd, last_dir_data_blk_num);
-			// if (status < 0) goto fail_ret;
-			// parent_inode.direct_blks[i] = 0;
-			status = -EIO; // TEMP: error out because waiting for feature
-			goto fail_ret;
-			parent_inode.file_size -= UWUFS_BLOCK_SIZE; // handled by the iter?
+			last_dblk_index = remove_dblk(&parent_inode, fd, num_data_blks - 1);
+			if (last_dblk_index != num_data_blks - 1) {
+				status = -EIO;
+				goto fail_ret;
+			}
+			parent_inode.file_size -= UWUFS_BLOCK_SIZE;
 			parent_inode.file_ctime = (uint64_t)unix_time;
 		} else {
 			status = write_blk(fd, &last_dir_data_blk, last_dblk_num);
