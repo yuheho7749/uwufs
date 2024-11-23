@@ -97,6 +97,10 @@ std::pair<uwufs_blk_t, bool> INode::recursive_remove_dblk(int device_fd, uint8_t
 #endif
             return {block_no, true};
         }
+        indirect_block.block_nos[index] = 0;
+        if (write_blk(device_fd, &indirect_block, cur_no) < 0) {
+            return {0, false};
+        }
         return {block_no, false};
     }
     uwufs_blk_t mod = 1;
@@ -104,14 +108,20 @@ std::pair<uwufs_blk_t, bool> INode::recursive_remove_dblk(int device_fd, uint8_t
         mod *= UWUFS_BLOCK_SIZE / sizeof(uwufs_blk_t);
     }
     auto [block_no, free] = recursive_remove_dblk(device_fd, level - 1, indirect_block.block_nos[index / mod], index % mod);
-    if (free && index == 0) {
-        if (free_blk(device_fd, cur_no) < 0) {
-            return {0, true};
-        }
+    if (free) { // the child indirect block is empty
+        if (index == 0) {   // need to free the current indirect block
+            if (free_blk(device_fd, cur_no) < 0) {
+                return {0, true};
+            }
 #ifdef DEBUG
-        printf("free indirect block: %lu\n", cur_no);
+            printf("free indirect block: %lu\n", cur_no);
 #endif
-        return {block_no, true};
+            return {block_no, true};
+        }
+        indirect_block.block_nos[index / mod] = 0;
+        if (write_blk(device_fd, &indirect_block, cur_no) < 0) {
+            return {0, false};
+        }
     }
     return {block_no, false};
 }
@@ -126,17 +136,28 @@ uwufs_blk_t INode::remove_dblk(uwufs_inode *inode, int device_fd, uwufs_blk_t in
         return 0;
     }
     if (index < LEVEL_0_BLOCKS) {   // direct block
-        return inode->direct_blks[index];
+        auto block_no = inode->direct_blks[index];
+        inode->direct_blks[index] = 0;
+        return block_no;
     }
     if (index < LEVEL_1_BLOCKS) {  // single indirect block
-        auto [block_no, _] = recursive_remove_dblk(device_fd, 0, inode->single_indirect_blks, index - LEVEL_0_BLOCKS);
+        auto [block_no, free] = recursive_remove_dblk(device_fd, 0, inode->single_indirect_blks, index - LEVEL_0_BLOCKS);
+        if (free) {
+            inode->single_indirect_blks = 0;
+        }
         return block_no;
     }
     if (index < LEVEL_2_BLOCKS) {  // double indirect block
-        auto [block_no, _] = recursive_remove_dblk(device_fd, 1, inode->double_indirect_blks, index - LEVEL_1_BLOCKS);
+        auto [block_no, free] = recursive_remove_dblk(device_fd, 1, inode->double_indirect_blks, index - LEVEL_1_BLOCKS);
+        if (free) {
+            inode->double_indirect_blks = 0;
+        }
         return block_no;
     }
     // triple indirect block
-    auto [block_no, _] = recursive_remove_dblk(device_fd, 2, inode->triple_indirect_blks, index - LEVEL_2_BLOCKS);
+    auto [block_no, free] = recursive_remove_dblk(device_fd, 2, inode->triple_indirect_blks, index - LEVEL_2_BLOCKS);
+    if (free) {
+        inode->triple_indirect_blks = 0;
+    }
     return block_no;
 }
