@@ -26,7 +26,7 @@
 /**
  * Creates a linked list structure for the freelist
  * 
- * TODO:
+ * NOTE:
  * Need to use a more efficient method of storing a freelist
  */
 static uwufs_blk_t init_freelist(int fd,
@@ -100,9 +100,12 @@ static void init_superblock(int fd,
 	super_blk.total_blks = total_blks;
 	super_blk.ilist_start = ilist_start;
 	super_blk.ilist_total_size = ilist_total_size;
+	super_blk.free_inodes_left = ilist_total_size * 
+		(UWUFS_BLOCK_SIZE / sizeof(struct uwufs_inode)) - 3; // 0, 1, 2 are reserved/used
 	super_blk.freelist_start = freelist_start;
 	super_blk.freelist_total_size = freelist_total_size;
 	super_blk.freelist_head = freelist_head;
+	super_blk.free_blks_left = freelist_total_size - 1; // One block as buffer?
 
 	// Write super block to device
 	ssize_t bytes_written = write_blk(fd, &super_blk, 0);
@@ -145,7 +148,6 @@ static void init_inodes(int fd,
 	
 
 /**
- * TODO:
  * TEST:
  * Make inodes a linked list for easy allocation and deallocation of
  * 		inodes.
@@ -159,7 +161,7 @@ static void init_inodes2(int fd,
 	struct uwufs_inode free_inode;
 	free_inode.file_mode = F_TYPE_FREE;
 
-	// TODO: Might want to make a inode linked list as well?
+	// NOTE: Might want to make a inode linked list as well?
 
 	uwufs_blk_t i;
 	ssize_t status;
@@ -188,11 +190,6 @@ static void init_root_directory(int fd)
 	memset(&root_inode, 0, sizeof(root_inode));
 	ssize_t status;
 	time_t unix_time;
-
-	// TODO: Abstract this to add_directory_file_entry (which is
-	// 		different from create_directory_file_entry)
-	// 		add_directory_file_entry should do the malloc_blk if
-	// 		there is no additional space in its allocated data blks
 	
 	// Add . and .. entry
 	struct uwufs_directory_data_blk dir_blk;
@@ -305,7 +302,7 @@ int main(int argc, char *argv[])
 		perror("Failed to access block device");
 		return 1;
 	}
-	
+
 	int ret = 0;
 
 	// Get and check size of block device
@@ -331,8 +328,13 @@ int main(int argc, char *argv[])
 
 	// NOTE: Read user definable params later.
 	// 	Specifing blk_dev_size to format can help with testing too
+#ifdef DEBUG
+	ret = init_uwufs(fd, 100, UWUFS_RESERVED_SPACE,
+				  	 0.5f);
+#else
 	ret = init_uwufs(fd, blk_dev_size/UWUFS_BLOCK_SIZE, UWUFS_RESERVED_SPACE,
 				  	 UWUFS_ILIST_DEFAULT_PERCENTAGE);
+#endif
 
 	printf("Done formating device %s\n", argv[1]);
 	close(fd);

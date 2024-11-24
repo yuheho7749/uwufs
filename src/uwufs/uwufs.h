@@ -63,8 +63,10 @@ struct __attribute__((__packed__)) uwufs_super_blk {
 	uwufs_blk_t freelist_start;
 	uwufs_blk_t freelist_total_size;
 	uwufs_blk_t freelist_head;
+	uwufs_blk_t free_inodes_left;
+	uwufs_blk_t free_blks_left;
 
-	char padding[UWUFS_BLOCK_SIZE - (6 * sizeof(uwufs_blk_t))];
+	char padding[UWUFS_BLOCK_SIZE - (8 * sizeof(uwufs_blk_t))];
 };
 
 // 256 bytes for larger {a,m,c}times etc
@@ -99,6 +101,10 @@ struct __attribute__((__packed__)) uwufs_directory_data_blk {
 	// 16 entries (assuming 4096 byte block size and 256 bytes per entry)
 	struct uwufs_directory_file_entry file_entries[
 		UWUFS_BLOCK_SIZE/sizeof(struct uwufs_directory_file_entry)];
+};
+
+struct __attribute__((__packed__)) uwufs_indirect_blk {
+	uwufs_blk_t entries[UWUFS_BLOCK_SIZE / sizeof(uwufs_blk_t)];
 };
 
 struct __attribute__((__packed__)) uwufs_regular_file_data_blk {

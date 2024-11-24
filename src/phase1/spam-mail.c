@@ -133,8 +133,6 @@ static int spam_mail_readdir(const char *path, void *buf,
  *	Phase 1 Requirements: We can fake it by creating the file info in memory, 
  *		but that is not good for phase 2
  *
- * TODO:
- *	Phase 2 Requirements: We need to create this file in storage
  */
 static int spam_mail_create(const char *path, mode_t mode, 
 							struct fuse_file_info *fi)
