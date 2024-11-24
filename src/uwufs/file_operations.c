@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdbool.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #ifdef DEBUG
 #include <assert.h>
@@ -381,7 +383,18 @@ ssize_t write_file(int fd,
 	uwufs_blk_t cur_blk_num = offset_blk;
 	size_t cur_bytes_written = 0;
 
+	//blk number
+
+	//while(){
+		//append data blocks as needed
+	//}
+
 	struct uwufs_regular_file_data_blk data_blk;
+
+	//create_dblk_itr
+	//after every iter, i call dblk_itr_next
+
+	//write to all data blocks
 	while (cur_blk_num < UWUFS_DIRECT_BLOCKS &&
 			cur_bytes_written < size) {
 		

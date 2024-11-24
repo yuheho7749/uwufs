@@ -35,7 +35,9 @@ ssize_t write_blk(int fd,
 				  const void* buf,
 				  uwufs_blk_t blk_num)
 {
-	ssize_t status = lseek(fd, blk_num * UWUFS_BLOCK_SIZE, SEEK_SET);
+
+	off_t offset = blk_num * UWUFS_BLOCK_SIZE;
+	ssize_t status = lseek(fd, offset, SEEK_SET);
 	if (status < 0)
 		goto debug_msg_ret;
 
