@@ -92,6 +92,7 @@ int uwufs_mknod(const char *path, mode_t mode, dev_t device)
 int uwufs_mkdir(const char *path,
 				mode_t mode)
 {
+	printf("mkdir %s\n", path);
 	ssize_t status;
 	time_t unix_time;
 	// get the uid etc of the user
@@ -124,12 +125,14 @@ int uwufs_mkdir(const char *path,
 	// find the parent path inode
 	uwufs_blk_t parent_dir_inode_num;
 	status = namei(device_fd, parent_path, &root_inode, &parent_dir_inode_num);
+	printf("Debug after namei error?\n");
 	if (status < 0)
 		return -ENOENT;
 
 	// find free inode for new child dir
 	uwufs_blk_t child_dir_inode_num;
 	status = find_free_inode(device_fd, &child_dir_inode_num);
+	printf("Debug no free blks\n");
 	RETURN_IF_ERROR(status);
 
 	// allocate a new data blk
@@ -463,18 +466,15 @@ int __create_regular_file(const char *path,
 #ifdef DEBUG
 		printf("__create_regular_file: creating new file\n");
 #endif
-		printf("debug 1\n");
 		// Find parent inode
 		status = namei(device_fd, parent_path, NULL, &parent_dir_inode_num);
 		if (status < 0)
 			return -ENOENT;
 
-		printf("debug 2\n");
 		// Get new empty inode
 		status = find_free_inode(device_fd, &child_file_inode_num);
 		RETURN_IF_ERROR(status);
 
-		printf("debug 3\n");
 
 		// // very conservative with space left
 		// if (super_blk.free_blks_left < 4)
@@ -496,7 +496,6 @@ int __create_regular_file(const char *path,
 		child_file_inode.file_ctime = (uint64_t)unix_time;
 		child_file_inode.file_mtime = (uint64_t)unix_time;
 
-		printf("debug 4\n");
 		goto success_ret;
 	} else if (file_exists_status < 0) {
 		return file_exists_status;
@@ -505,7 +504,6 @@ int __create_regular_file(const char *path,
 	printf("create_regular_file: file already exists");
 #endif
 success_ret:
-	printf("debug 5\n");
 	child_file_inode.file_atime = (uint64_t)unix_time;
 	status = write_inode(device_fd, &child_file_inode,
 				   sizeof(child_file_inode), child_file_inode_num);

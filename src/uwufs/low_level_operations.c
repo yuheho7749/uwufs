@@ -238,7 +238,7 @@ ssize_t find_free_inode(int fd, uwufs_blk_t *inode_num) {
         }
         current_inode_blk++;
     }
-    return EDQUOT; // no free inodes
+    return -EDQUOT; // no free inodes
 
 debug_msg_ret:
 #ifdef DEBUG

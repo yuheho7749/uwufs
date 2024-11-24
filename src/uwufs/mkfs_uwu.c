@@ -100,12 +100,12 @@ static void init_superblock(int fd,
 	super_blk.total_blks = total_blks;
 	super_blk.ilist_start = ilist_start;
 	super_blk.ilist_total_size = ilist_total_size;
-	super_blk.free_inodes_left = (ilist_total_size - 1) * 
-		(UWUFS_BLOCK_SIZE / sizeof(struct uwufs_inode));
+	super_blk.free_inodes_left = ilist_total_size * 
+		(UWUFS_BLOCK_SIZE / sizeof(struct uwufs_inode)) - 3; // 0, 1, 2 are reserved/used
 	super_blk.freelist_start = freelist_start;
 	super_blk.freelist_total_size = freelist_total_size;
 	super_blk.freelist_head = freelist_head;
-	super_blk.free_blks_left = freelist_total_size - 2;
+	super_blk.free_blks_left = freelist_total_size - 1; // One block as buffer?
 
 	// Write super block to device
 	ssize_t bytes_written = write_blk(fd, &super_blk, 0);
@@ -330,7 +330,7 @@ int main(int argc, char *argv[])
 	// 	Specifing blk_dev_size to format can help with testing too
 #ifdef DEBUG
 	ret = init_uwufs(fd, 1000, UWUFS_RESERVED_SPACE,
-				  	 UWUFS_ILIST_DEFAULT_PERCENTAGE);
+				  	 0.02f);
 #else
 	ret = init_uwufs(fd, blk_dev_size/UWUFS_BLOCK_SIZE, UWUFS_RESERVED_SPACE,
 				  	 UWUFS_ILIST_DEFAULT_PERCENTAGE);
