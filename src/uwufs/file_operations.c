@@ -115,6 +115,9 @@ ssize_t add_directory_file_entry(int fd,
 			free_blk(fd, dir_data_blk_num);
 			return status;
 		}
+		// BUG: If append fails, we might lose some indirect blocks
+		// FIX: Check if there are enough blocks before calling this
+		// 		or garbage collect when it fails (I recommend the former)
 		uwufs_blk_t dir_data_blk_num2 = append_dblk(&dir_inode, fd, n,
 										  dir_data_blk_num);
 #ifdef DEBUG

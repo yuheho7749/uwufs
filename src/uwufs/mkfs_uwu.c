@@ -329,8 +329,8 @@ int main(int argc, char *argv[])
 	// NOTE: Read user definable params later.
 	// 	Specifing blk_dev_size to format can help with testing too
 #ifdef DEBUG
-	ret = init_uwufs(fd, 1000, UWUFS_RESERVED_SPACE,
-				  	 0.02f);
+	ret = init_uwufs(fd, 100, UWUFS_RESERVED_SPACE,
+				  	 0.5f);
 #else
 	ret = init_uwufs(fd, blk_dev_size/UWUFS_BLOCK_SIZE, UWUFS_RESERVED_SPACE,
 				  	 UWUFS_ILIST_DEFAULT_PERCENTAGE);

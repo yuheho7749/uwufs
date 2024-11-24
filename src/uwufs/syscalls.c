@@ -98,14 +98,15 @@ int uwufs_mkdir(const char *path,
 	// get the uid etc of the user
 	struct fuse_context *fuse_ctx = fuse_get_context();
 
-	// struct uwufs_super_blk super_blk;
-	// status = read_blk(device_fd, &super_blk, 0);
-	// if (status < 0)
-	// 	return status;
-	//
-	// if (super_blk.free_inodes_left == 0) {
-	// 	return -ENOSPC;
-	// }
+	// FIX: Here to make sure the append_dblk in add_directory_entry
+	// always have enough data blocks (remove it after the bug is fixed)
+	struct uwufs_super_blk super_blk;
+	status = read_blk(device_fd, &super_blk, 0);
+	if (status < 0)
+		return status;
+	if (super_blk.free_blks_left <= 7) {
+		return -ENOSPC;
+	}
 
 	// printf("original path %s", path);
 	// split path into parent + child parts
@@ -125,14 +126,12 @@ int uwufs_mkdir(const char *path,
 	// find the parent path inode
 	uwufs_blk_t parent_dir_inode_num;
 	status = namei(device_fd, parent_path, &root_inode, &parent_dir_inode_num);
-	printf("Debug after namei error?\n");
 	if (status < 0)
 		return -ENOENT;
 
 	// find free inode for new child dir
 	uwufs_blk_t child_dir_inode_num;
 	status = find_free_inode(device_fd, &child_dir_inode_num);
-	printf("Debug no free blks\n");
 	RETURN_IF_ERROR(status);
 
 	// allocate a new data blk
@@ -199,10 +198,6 @@ int uwufs_mkdir(const char *path,
 		return status;
 	}
 	
-	// super_blk.free_inodes_left -= 1;
-	// status = write_blk(device_fd, &super_blk, 0);
-	// if (status < 0)
-	// 	return -EIO;
 	return 0;
 }
 
@@ -448,14 +443,16 @@ int __create_regular_file(const char *path,
 		unix_time = 0;
 
 	ssize_t status;
-	// struct uwufs_super_blk super_blk;
-	// status = read_blk(device_fd, &super_blk, 0);
-	// if (status < 0)
-	// 	return status;
-	//
-	// if (super_blk.free_inodes_left == 0) {
-	// 	return -ENOSPC;
-	// }
+
+	// FIX: Here to make sure the append_dblk in add_directory_entry
+	// always have enough data blocks (remove it after the bug is fixed)
+	struct uwufs_super_blk super_blk;
+	status = read_blk(device_fd, &super_blk, 0);
+	if (status < 0)
+		return status;
+	if (super_blk.free_blks_left <= 5) {
+		return -ENOSPC;
+	}
 
 	status = split_path_parent_child(path, parent_path, child_path);
 	if (status < 0)
@@ -474,11 +471,6 @@ int __create_regular_file(const char *path,
 		// Get new empty inode
 		status = find_free_inode(device_fd, &child_file_inode_num);
 		RETURN_IF_ERROR(status);
-
-
-		// // very conservative with space left
-		// if (super_blk.free_blks_left < 4)
-		// 	return -ENOSPC;
 
 		// Add child file entry to parent dir
 		status = add_directory_file_entry(device_fd, parent_dir_inode_num,
@@ -510,10 +502,6 @@ success_ret:
 	if (status < 0)
 		return -EIO;
 
-	// super_blk.free_inodes_left -= 1;
-	// status = write_blk(device_fd, &super_blk, 0);
-	// if (status < 0)
-	// 	return -EIO;
 	return 0;
 }
 
