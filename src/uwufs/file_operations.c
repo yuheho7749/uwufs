@@ -550,40 +550,42 @@ ssize_t read_file(int fd,
 	size_t offset_bytes = offset % UWUFS_BLOCK_SIZE;
 	uwufs_blk_t offset_blk = offset / UWUFS_BLOCK_SIZE; 
 	
-	// TODO: indirect blks, only handles direct blks for now!
 	uwufs_blk_t cur_blk_num = offset_blk;
 	size_t cur_bytes_read = 0;
+
+	dblk_itr_t dblk_itr = create_dblk_itr(inode, fd, cur_blk_num);
 
 	struct uwufs_regular_file_data_blk data_blk;
 	while (cur_blk_num < UWUFS_DIRECT_BLOCKS &&
 			cur_bytes_read < size) {
-
-		if (inode->direct_blks[cur_blk_num] == 0) {
-			//return 0;
-			return cur_bytes_read;
-		}
 		
-		status = read_blk(fd, &data_blk, inode->direct_blks[cur_blk_num]);
+		cur_blk_num = dblk_itr_next(dblk_itr);
+		if (cur_blk_num == 0) 
+			return cur_bytes_read;
+
+		status = read_blk(fd, &data_blk, cur_blk_num);
 		RETURN_IF_ERROR(status);
 
-		if (offset_bytes > 0 && cur_bytes_read == 0) {
-			// TODO: only copy from offset byte
-			// read in blk first and memcpy from offset
-		}
-
-		// read full block
 		size_t bytes_remaining = size - cur_bytes_read;
-		if (bytes_remaining > UWUFS_BLOCK_SIZE) {
+
+		// first block and offset > 0
+		if (offset_bytes > 0 && cur_bytes_read == 0) {
+			size_t bytes_from_offset = UWUFS_BLOCK_SIZE - offset_bytes;
+			size_t bytes_to_read = bytes_remaining < bytes_from_offset ? bytes_remaining : bytes_from_offset;
+			memcpy(buf, &data_blk + offset_bytes, bytes_to_read);
+			cur_bytes_read += bytes_to_read;
+		}
+		// regular read, full block
+		else if (bytes_remaining > UWUFS_BLOCK_SIZE) {
 			memcpy(buf + cur_bytes_read, &data_blk, sizeof(data_blk));
 			cur_bytes_read += UWUFS_BLOCK_SIZE;
 		}
-		else { // only read part of block up to size provided
+		else { // last block and partial read
 			memcpy(buf + cur_bytes_read, &data_blk, bytes_remaining);
 			cur_bytes_read += bytes_remaining;
 			return cur_bytes_read;
 		}
 
-		cur_blk_num += 1;
 	}
 	return cur_bytes_read;
 }
@@ -607,33 +609,28 @@ ssize_t write_file(int fd,
 	uwufs_blk_t cur_blk_num = offset_blk;
 	size_t cur_bytes_written = 0;
 
-
-
 	struct uwufs_regular_file_data_blk data_blk;
-
-	//blk number
 
 	while(cur_bytes_written < size){
 		uwufs_blk_t new_blk_num = get_dblk(inode, fd, cur_blk_num);
 
 		if(new_blk_num == 0){
-			ssize_t status = malloc_blk(fd, &new_blk_num);
-			if(status <= 5){
-				return status;
-			}
-			append_dblk(inode, fd, cur_blk_num, new_blk_num);
+			status = malloc_blk(fd, &new_blk_num);
+			RETURN_IF_ERROR(status);
+			status = append_dblk(inode, fd, cur_blk_num, new_blk_num);
+			if (status == 0)
+				return -EIO; //maybe there's a better error code to return here
+
 			memset(&data_blk, 0, UWUFS_BLOCK_SIZE);
-			new_blk_num = get_dblk(inode, fd, cur_blk_num);
+		}
+		else {
+			status = read_blk(fd, &data_blk, new_blk_num);
+			RETURN_IF_ERROR(status);
 		}
 
 		size_t bytes_remaining = size - cur_bytes_written;
 
 		if (offset_bytes > 0 && cur_bytes_written == 0) {
-			// need to read or memset the full block first, 
-			// and only write part of it from offset
-			status = read_blk(fd, &data_blk, new_blk_num);
-			RETURN_IF_ERROR(status);
-
 			// Now write data starting at offset
 			size_t block_space_available = UWUFS_BLOCK_SIZE - offset_bytes;
     		size_t bytes_to_write = bytes_remaining < block_space_available ? bytes_remaining : block_space_available;
@@ -665,8 +662,10 @@ ssize_t write_file(int fd,
 	inode->file_mtime = (int64_t)unix_time;
 	inode->file_ctime = (int64_t)unix_time;
 
-	// MUST CHANGE; only for now
-	inode->file_size = cur_bytes_written;
+	// if we created new data blocks beyond the existing file size, increase file size
+	size_t newly_written_size = cur_bytes_written + offset;
+	if (newly_written_size > inode->file_size)
+		inode->file_size = newly_written_size;
 
 	status = write_inode(fd, inode, sizeof(struct uwufs_inode), inode_num);
 	RETURN_IF_ERROR(status);
