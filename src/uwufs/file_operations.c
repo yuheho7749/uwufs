@@ -1,7 +1,7 @@
 /**
  * Implements file operations for uwufs.
  *
- * Authors: Joseph, Kay
+ * Authors: Joseph, Kay, Jason
  */
 
 #include "file_operations.h"
@@ -589,7 +589,7 @@ ssize_t read_file(int fd,
 }
 
 
-
+//write file
 ssize_t write_file(int fd, 
 				  const char *buf,
 				  size_t size,
@@ -597,59 +597,68 @@ ssize_t write_file(int fd,
 				  struct uwufs_inode *inode,
 				  uwufs_blk_t inode_num)
 {
+
+	//offset initialization
 	ssize_t status;
 	size_t offset_bytes = offset % UWUFS_BLOCK_SIZE;
 	uwufs_blk_t offset_blk = offset / UWUFS_BLOCK_SIZE; 
 
-	// TODO: indirect blks, only handles direct blks for now!
+	//curr values
 	uwufs_blk_t cur_blk_num = offset_blk;
 	size_t cur_bytes_written = 0;
 
-	//blk number
 
-	//while(){
-		//append data blocks as needed
-	//}
 
 	struct uwufs_regular_file_data_blk data_blk;
 
-	//create_dblk_itr
-	//after every iter, i call dblk_itr_next
+	//blk number
 
-	//write to all data blocks
-	while (cur_blk_num < UWUFS_DIRECT_BLOCKS &&
-			cur_bytes_written < size) {
-		
-		uwufs_blk_t new_blk_num = inode->direct_blks[cur_blk_num];
-		if (new_blk_num == 0) {
-			status = malloc_blk(fd, &new_blk_num);
-			RETURN_IF_ERROR(status);
-			inode->direct_blks[cur_blk_num] = new_blk_num;
+	while(cur_bytes_written < size){
+		uwufs_blk_t new_blk_num = get_dblk(inode, fd, cur_blk_num);
+
+		if(new_blk_num == 0){
+			ssize_t status = malloc_blk(fd, &new_blk_num);
+			if(status <= 5){
+				return status;
+			}
+			append_dblk(inode, fd, cur_blk_num, new_blk_num);
 			memset(&data_blk, 0, UWUFS_BLOCK_SIZE);
-		} 
-		
+			new_blk_num = get_dblk(inode, fd, cur_blk_num);
+		}
+
+		size_t bytes_remaining = size - cur_bytes_written;
+
 		if (offset_bytes > 0 && cur_bytes_written == 0) {
 			// need to read or memset the full block first, 
 			// and only write part of it from offset
-		}
+			status = read_blk(fd, &data_blk, new_blk_num);
+			RETURN_IF_ERROR(status);
 
-		// write full block
-		size_t bytes_remaining = size - cur_bytes_written;
-		if (bytes_remaining >= UWUFS_BLOCK_SIZE) {
-			
-			memcpy(&data_blk, buf + cur_bytes_written, sizeof(data_blk));
+			// Now write data starting at offset
+			size_t block_space_available = UWUFS_BLOCK_SIZE - offset_bytes;
+    		size_t bytes_to_write = bytes_remaining < block_space_available ? bytes_remaining : block_space_available;
+
+			memcpy((char*)&data_blk + offset_bytes, buf + cur_bytes_written, bytes_to_write);
+			cur_bytes_written += bytes_to_write;
+		} else {
+			//new block: 
+			if (bytes_remaining >= UWUFS_BLOCK_SIZE) {
+				//need another block
+				memcpy(&data_blk, buf + cur_bytes_written, sizeof(data_blk));
 			cur_bytes_written += UWUFS_BLOCK_SIZE;
-		}
-		else { // only write part of block up to size provided
-			memcpy(&data_blk, buf + cur_bytes_written, bytes_remaining);
-			cur_bytes_written += bytes_remaining;
+			} else {
+				//last block we need
+				memcpy(&data_blk, buf + cur_bytes_written, bytes_remaining);
+				cur_bytes_written += bytes_remaining;
+			}
 		}
 
 		status = write_blk(fd, &data_blk, new_blk_num);
-		RETURN_IF_ERROR(status);
+	 	RETURN_IF_ERROR(status);
 
 		cur_blk_num += 1;
 	}
+
 	time_t unix_time;
 	unix_time = time(NULL);
 	inode->file_atime = (int64_t)unix_time;

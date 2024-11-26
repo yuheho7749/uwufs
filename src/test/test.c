@@ -171,6 +171,8 @@ int main(int argc, char* argv[]) {
 	printf("\tFile perm: %o\n", f_mode & F_PERM_BITS);
 	printf("\tDir size (raw): %lu\n", random_inode.file_size);
 
+	// ----- Test write_file -----
+
 	close(fd);
 	return ret;
 }
