@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	// TODO: Check integrity of block device/partition
+	// NOTE: LATER - Check integrity of block device/partition
 #ifdef DEBUG
 	printf("Skip checking integrity of block device/partition...\n");
 #endif

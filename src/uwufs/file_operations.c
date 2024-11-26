@@ -14,6 +14,8 @@
 #include <time.h>
 #include <stdbool.h>
 
+#include "cpp/c_api.h"
+
 #ifdef DEBUG
 #include <assert.h>
 #endif
@@ -55,6 +57,10 @@ ssize_t add_directory_file_entry(int fd,
 {
 	ssize_t status;
 	time_t unix_time;
+	struct uwufs_directory_data_blk dir_data_blk;
+	uwufs_blk_t dir_data_blk_num;
+	bool has_malloc = false;
+
 	unix_time = time(NULL);
 	if (unix_time == -1)
 		unix_time = 0;
@@ -63,53 +69,89 @@ ssize_t add_directory_file_entry(int fd,
 	status = read_inode(fd, &dir_inode, dir_inode_num);
 	RETURN_IF_ERROR(status);
 
-	struct uwufs_directory_data_blk dir_blk;
-	int i;
-	for (i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
-		uwufs_blk_t dir_blk_num = dir_inode.direct_blks[i];
+	// ceil division although it is not necessary if size of dir is
+	// UWUFS_BLOCK_SIZE aligned
+	uwufs_blk_t n = (dir_inode.file_size + UWUFS_BLOCK_SIZE - 1)
+		/ UWUFS_BLOCK_SIZE;
 
-		// alloc new data blk
-		if (dir_blk_num == 0) {
-			status = malloc_blk(fd, &dir_blk_num);
-			if (status < 0 || dir_blk_num <= 0)
-				return -ENOSPC;
+	// If directory is completely empty
+	if (n == 0) {
+		status = malloc_blk(fd, &dir_data_blk_num);
+		if (status < 0 || dir_data_blk_num <= 0)
+			return -ENOSPC;
+		
+		has_malloc = true;
+		dir_inode.direct_blks[0] = dir_data_blk_num;
+		dir_inode.file_size += UWUFS_BLOCK_SIZE;
+		dir_inode.file_ctime = (uint64_t)unix_time;
 
-			dir_inode.direct_blks[i] = dir_blk_num;
-			dir_inode.file_size += UWUFS_BLOCK_SIZE;
-			dir_inode.file_ctime = (uint64_t)unix_time;
-
-			memset(&dir_blk, 0, sizeof(dir_blk));
-		}
-		else {
-			status = read_blk(fd, &dir_blk, dir_blk_num);
-			RETURN_IF_ERROR(status);
-		}
-
-		status = put_directory_file_entry(&dir_blk, name, file_inode_num);
-		if (status < 0) // no space, so go to next dir blk
-			continue;
-
-		// increase nlinks (if added new dir)
-		dir_inode.file_links_count += nlinks_change;
-		if (nlinks_change != 0)
-			dir_inode.file_ctime = (uint64_t)unix_time;
-		dir_inode.file_mtime = (uint64_t)unix_time;
-		dir_inode.file_atime = (uint64_t)unix_time;
-
-		status = write_inode(fd, &dir_inode, sizeof(dir_inode), dir_inode_num);
-		RETURN_IF_ERROR(status);
-
-		// not sure if want to keep write in this fn or move out of 
-		status = write_blk(fd, &dir_blk, dir_blk_num);
-		RETURN_IF_ERROR(status);
-		return 0;
+		memset(&dir_data_blk, 0, sizeof(dir_data_blk));
+	} else { // Read last block
+		// Assume the dir entries are packed (no holes)
+		dir_data_blk_num = get_dblk(&dir_inode, fd, n-1);
+		if (dir_data_blk_num == 0)
+			return -EIO;
 	}
 
-	// NOTE: Only cares if none of the direct blks have space
-	// TODO: indirect blks
-	return -ENOSPC;
+	status = read_blk(fd, &dir_data_blk, dir_data_blk_num);
+	if (status < 0)
+		goto error_ret;
+	// RETURN_IF_ERROR(status);
+
+	status = put_directory_file_entry(&dir_data_blk, name, file_inode_num);
+	if (status == -ENOSPC) {
+		status = malloc_blk(fd, &dir_data_blk_num);
+		if (status < 0 || dir_data_blk_num <= 0) {
+			status = -ENOSPC;
+			goto error_ret;
+		}
+
+		dir_inode.file_size += UWUFS_BLOCK_SIZE;
+		dir_inode.file_ctime = (uint64_t)unix_time;
+
+		memset(&dir_data_blk, 0, sizeof(dir_data_blk));
+		status = put_directory_file_entry(&dir_data_blk, name, file_inode_num);
+		if (status < 0) {
+			free_blk(fd, dir_data_blk_num);
+			return status;
+		}
+		// BUG: If append fails, we might lose some indirect blocks
+		// FIX: Check if there are enough blocks before calling this
+		// 		or garbage collect when it fails (I recommend the former)
+		uwufs_blk_t dir_data_blk_num2 = append_dblk(&dir_inode, fd, n,
+										  dir_data_blk_num);
+#ifdef DEBUG
+		assert(dir_data_blk_num2 == dir_data_blk_num);
+#endif
+	} else if (status < 0) {
+		goto error_ret;
+	}
+
+	// Entry add success and return
+	dir_inode.file_links_count += nlinks_change;
+	if (nlinks_change != 0)
+		dir_inode.file_ctime = (uint64_t)unix_time;
+	dir_inode.file_mtime = (uint64_t)unix_time;
+	dir_inode.file_atime = (uint64_t)unix_time;
+
+	status = write_inode(fd, &dir_inode, sizeof(dir_inode), dir_inode_num);
+	// RETURN_IF_ERROR(status);
+	if (status < 0)
+		goto error_ret;
+
+	status = write_blk(fd, &dir_data_blk, dir_data_blk_num);
+	// RETURN_IF_ERROR(status);
+	if (status < 0)
+		goto error_ret;
+	return 0;
+
+error_ret:
+	if (has_malloc)
+		free_blk(fd, dir_data_blk_num);
+	return status;
 }
 
+// NOTE: Deprecated (need to handle indirect blocks)
 ssize_t count_directory_file_entries(int fd,
 								 	 struct uwufs_inode *dir_inode,
 								 	 int *nentries)
@@ -138,9 +180,30 @@ ssize_t count_directory_file_entries(int fd,
 			}		
 		}
 	}
-	// TODO: indirect blocks
+	// NOTE: indirect blocks
 	*nentries = num_entries;
 	return 0;
+}
+
+// Assumes the directory entries are semi-packed, meaning
+// 		entries are packed in the lowest number of data blocks
+// 		except for the last data block, which may be not completely
+// 		filled. The last data block does not have to be strictly packed
+bool is_directory_empty(int fd, struct uwufs_inode *dir_inode) {
+	ssize_t status;
+	size_t i;
+	int count = 0;
+
+	struct uwufs_directory_data_blk dir_blk;
+	status = read_blk(fd, &dir_blk, dir_inode->direct_blks[0]);
+	RETURN_IF_ERROR(status);
+
+	for (i = 0; i < UWUFS_BLOCK_SIZE/sizeof(struct uwufs_directory_data_blk); i++) {
+		if (dir_blk.file_entries[i].inode_num != 0) {
+			count += 1;
+		}
+	}
+	return count <= 2;
 }
 
 ssize_t split_path_parent_child(const char *path,
@@ -176,40 +239,47 @@ ssize_t split_path_parent_child(const char *path,
 }
 
 ssize_t __remove_entry_from_dir_data_blk(int fd,
-										 uwufs_blk_t dir_data_blk_num,
-										 const char name[UWUFS_FILE_NAME_SIZE],
-										 uwufs_blk_t file_inode_num)
+						 struct uwufs_directory_data_blk *dir_data_blk,
+						 struct uwufs_directory_data_blk *last_dir_data_blk,
+						 int last_file_entry_index,
+						 const char name[UWUFS_FILE_NAME_SIZE],
+						 uwufs_blk_t file_inode_num)
 {
 	ssize_t status;
 	int i;
-	int entries = 0;
-	bool has_not_removed = true;
 	int n = UWUFS_BLOCK_SIZE/sizeof(struct uwufs_directory_file_entry);
-	struct uwufs_directory_data_blk dir_data_blk;
 	struct uwufs_directory_file_entry file_entry;
 
-	status = read_blk(fd, &dir_data_blk, dir_data_blk_num);
-	if (status < 0)
-		return status;
-
 	for (i = 0; i < n; i++) {
-		file_entry = dir_data_blk.file_entries[i];
-		if (file_entry.inode_num != 0)
-			entries += 1;
-		if (has_not_removed &&
-			file_entry.inode_num == file_inode_num &&
-			strcmp(file_entry.file_name, name) == 0) {
-			has_not_removed = false;
+		file_entry = dir_data_blk->file_entries[i];
+		if (file_entry.inode_num == file_inode_num &&
+			(name == NULL || strcmp(file_entry.file_name, name) == 0)) {
 			// clear file entry
-			memset(&dir_data_blk.file_entries[i], 0, sizeof(file_entry));
-			status = write_blk(fd, &dir_data_blk, dir_data_blk_num);
-			if (status < 0) return status;
+			goto found_entry_ret;
 		}
 	}
-	if (has_not_removed)
-		return -ENOENT;
+	return -ENOENT;
 
-	return entries - 1;
+found_entry_ret:
+	if (last_dir_data_blk == NULL && i == last_file_entry_index) {
+		memset(&dir_data_blk->file_entries[i], 0, sizeof(file_entry));
+	} else if (last_dir_data_blk == NULL) {
+		memcpy(&dir_data_blk->file_entries[i],
+			 &(dir_data_blk->file_entries[last_file_entry_index]),
+			 sizeof(file_entry));
+		memset(&(dir_data_blk->file_entries[last_file_entry_index]),
+			 0, sizeof(file_entry));
+	} else {
+		memcpy(&dir_data_blk->file_entries[i],
+			 &(last_dir_data_blk->file_entries[last_file_entry_index]),
+			 sizeof(file_entry));
+		memset(&(last_dir_data_blk->file_entries[last_file_entry_index]),
+			 0, sizeof(file_entry));
+	}
+	// 0 or positive when successful - can be used to tell if last dir
+	// is empty assuming the last_file_entry_index is scanned in reverse
+	// by the caller of this function
+	return last_file_entry_index;
 }
 
 /**
@@ -227,8 +297,17 @@ ssize_t unlink_file(int fd,
 	uwufs_blk_t parent_inode_num;
 	char parent_path[strlen(path)+1];
 	char child_path[UWUFS_FILE_NAME_SIZE];
-	int i;
-	uwufs_blk_t dir_blk_num;
+	uwufs_blk_t i;
+	uwufs_blk_t last_dblk_num;
+	uwufs_blk_t last_dblk_index;
+	struct uwufs_directory_data_blk dir_data_blk;
+	uwufs_blk_t dir_data_blk_num;
+	struct uwufs_directory_data_blk last_dir_data_blk;
+	uwufs_blk_t num_data_blks;
+	uwufs_blk_t last_dir_entry_inode_num;
+	int last_file_entry_index;
+	int num_file_entries = UWUFS_BLOCK_SIZE / sizeof(struct uwufs_directory_file_entry);
+	dblk_itr_t dblk_itr = NULL;
 
 	unix_time = time(NULL);
 	if (unix_time == -1)
@@ -246,35 +325,85 @@ ssize_t unlink_file(int fd,
 	if (status < 0)
 		return status;
 
-	for (i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
-		dir_blk_num = parent_inode.direct_blks[i];
+	// Find last block for compacting things
+	num_data_blks = (parent_inode.file_size + UWUFS_BLOCK_SIZE - 1)
+		/ UWUFS_BLOCK_SIZE;
+	last_dblk_num = get_dblk(&parent_inode, fd, num_data_blks - 1);
+	status = read_blk(fd, &last_dir_data_blk, last_dblk_num);
+	if (status < 0) return status;
+	for (last_file_entry_index = num_file_entries - 1;
+		last_file_entry_index >= 0;
+		last_file_entry_index--) {
+		last_dir_entry_inode_num = last_dir_data_blk.file_entries[last_file_entry_index].inode_num;
+		if (last_dir_entry_inode_num > 0) {
+			goto found_last_entry;
+		}
+	}
+	printf("unlink_file: directory data block has inconsistent entries\n");
+	return -EIO;
 
-		if (dir_blk_num == 0)
-			continue;
+found_last_entry:
+	dblk_itr = create_dblk_itr(&parent_inode, fd, 0);
+	for (i = 0; i < num_data_blks; i++) {
+		dir_data_blk_num = dblk_itr_next(dblk_itr);
+		if (dir_data_blk_num == 0) {
+			status = -ENOENT;
+			goto fail_ret;
+		}
 
-		status = __remove_entry_from_dir_data_blk(fd, dir_blk_num, child_path,
-											inode_num);
+		status = read_blk(fd, &dir_data_blk, dir_data_blk_num);
+		if (status < 0)
+			goto fail_ret;
+
+		// this looks bad, but compiler will optimizes it :)
+		if (last_dblk_num == dir_data_blk_num) {
+			status = __remove_entry_from_dir_data_blk(fd,
+												&dir_data_blk,
+												NULL,
+												last_file_entry_index,
+												child_path,
+												inode_num);
+		} else {
+			status = __remove_entry_from_dir_data_blk(fd,
+												&dir_data_blk,
+												&last_dir_data_blk,
+												last_file_entry_index,
+												child_path,
+												inode_num);
+		}
+
 		if (status == -ENOENT)
 			continue;
 		if (status < 0)
-			return status;
+			goto fail_ret;
 
-		// if there are no more entries in dir_data_blk, free it
+		// last file entry index is 0 so the last blk is empty
 		if (status == 0) {
-			status = free_blk(fd, dir_blk_num);
-			// NOTE: might compact the blks later
-			parent_inode.direct_blks[i] = 0;
+			last_dblk_index = remove_dblk(&parent_inode, fd, num_data_blks - 1);
+			if (last_dblk_index != last_dblk_num) {
+				status = -EIO;
+				goto fail_ret;
+			}
+			free_blk(fd, last_dblk_index); // remove_dblk does not free the actual dblk...
 			parent_inode.file_size -= UWUFS_BLOCK_SIZE;
 			parent_inode.file_ctime = (uint64_t)unix_time;
+		} else {
+			status = write_blk(fd, &last_dir_data_blk, last_dblk_num);
+			if (status < 0) goto fail_ret;
 		}
+
+		status = write_blk(fd, &dir_data_blk, dir_data_blk_num);
+		if (status < 0)
+			goto fail_ret;
 
 		goto success_ret;
 	}
-	// TODO: Indirect blocks
-
-	return -ENOENT;
+fail_ret:
+	destroy_dblk_itr(dblk_itr);
+	return status;
 
 success_ret:
+	destroy_dblk_itr(dblk_itr);
 #ifdef DEBUG
 	assert(inode->file_links_count >= 1);
 #endif
@@ -288,6 +417,66 @@ success_ret:
 	if (status < 0) return status;
 	return 0;
 }
+
+ssize_t __free_indirect_blk(int fd,
+							struct uwufs_indirect_blk *indirect_blk)
+{
+	ssize_t status;
+	int i;
+	int n = UWUFS_BLOCK_SIZE / sizeof(uwufs_blk_t);
+	for (i = 0; i < n; i++) {
+		if (indirect_blk->entries[i] <= 1 + UWUFS_RESERVED_SPACE)
+			continue;
+		status = free_blk(fd, indirect_blk->entries[i]);
+		if (status < 0) return status;
+	}
+	return 0;
+}
+
+ssize_t __free_double_indirect_blk(int fd,
+							struct uwufs_indirect_blk *double_indirect_blk)
+{
+	ssize_t status;
+	struct uwufs_indirect_blk single_indirect_blk;
+	int i;
+	int n = UWUFS_BLOCK_SIZE / sizeof(uwufs_blk_t);
+	for (i = 0; i < n; i++) {
+		if (double_indirect_blk->entries[i] <= 1 + UWUFS_RESERVED_SPACE)
+			continue;
+		status = read_blk(fd, &single_indirect_blk, double_indirect_blk->entries[i]);
+		if (status < 0) return status;
+
+		status = __free_indirect_blk(fd, &single_indirect_blk);
+		if (status < 0) return status;
+
+		status = free_blk(fd, double_indirect_blk->entries[i]);
+		if (status < 0) return status;
+	}
+	return 0;
+}
+
+ssize_t __free_triple_indirect_blk(int fd,
+							struct uwufs_indirect_blk *triple_indirect_blk)
+{
+	ssize_t status;
+	struct uwufs_indirect_blk double_indirect_blk;
+	int i;
+	int n = UWUFS_BLOCK_SIZE / sizeof(uwufs_blk_t);
+	for (i = 0; i < n; i++) {
+		if (triple_indirect_blk->entries[i] <= 1 + UWUFS_RESERVED_SPACE)
+			continue;
+		status = read_blk(fd, &double_indirect_blk, triple_indirect_blk->entries[i]);
+		if (status < 0) return status;
+
+		status = __free_double_indirect_blk(fd, &double_indirect_blk);
+		if (status < 0) return status;
+
+		status = free_blk(fd, triple_indirect_blk->entries[i]);
+		if (status < 0) return status;
+	}
+	return 0;
+}
+
 /**
  * Clears the actual inode/file if the link count is 0
  */
@@ -296,16 +485,48 @@ ssize_t remove_file(int fd,
 					  uwufs_blk_t inode_num)
 {
 	ssize_t status;
+	struct uwufs_indirect_blk single_indirect_blk;
+	struct uwufs_indirect_blk double_indirect_blk;
+	struct uwufs_indirect_blk triple_indirect_blk;
 	int i;
+
+free_triple_indirect_blks:
+	if (inode->triple_indirect_blks < 1 + UWUFS_RESERVED_SPACE)
+		goto free_double_indirect_blks;
+	status = read_blk(fd, &triple_indirect_blk, inode->triple_indirect_blks);
+	if (status < 0) return status;
+	status = __free_triple_indirect_blk(fd, &triple_indirect_blk);
+	if (status < 0) return status;
+	status = free_blk(fd, inode->triple_indirect_blks);
+	if (status < 0) return status;
+
+free_double_indirect_blks:
+	if (inode->double_indirect_blks < 1 + UWUFS_RESERVED_SPACE)
+		goto free_single_indirect_blks;
+	status = read_blk(fd, &double_indirect_blk, inode->double_indirect_blks);
+	if (status < 0) return status;
+	status = __free_double_indirect_blk(fd, &double_indirect_blk);
+	if (status < 0) return status;
+	status = free_blk(fd, inode->double_indirect_blks);
+	if (status < 0) return status;
+
+free_single_indirect_blks:
+	if (inode->single_indirect_blks < 1 + UWUFS_RESERVED_SPACE)
+		goto free_direct_blks;
+	status = read_blk(fd, &single_indirect_blk, inode->single_indirect_blks);
+	if (status < 0) return status;
+	status = __free_indirect_blk(fd, &single_indirect_blk);
+	if (status < 0) return status;
+	status = free_blk(fd, inode->single_indirect_blks);
+	if (status < 0) return status;
+
+free_direct_blks:
 	for (i = 0; i < UWUFS_DIRECT_BLOCKS; i++) {
-		// TEMP: Check if it points to data blks (after ilist)
-		if (inode->direct_blks[i] <= 1 + UWUFS_RESERVED_SPACE)
+		if (inode->direct_blks[i] < 1 + UWUFS_RESERVED_SPACE)
 			continue;
 		status = free_blk(fd, inode->direct_blks[i]);
 		if (status < 0) return status;
 	}
-
-	// TODO: Indirect blocks
 
 	// NOTE: 2 options
 	// 1. mark as free inode

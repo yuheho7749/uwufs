@@ -93,15 +93,12 @@ ssize_t find_free_inode(int fd, uwufs_blk_t *inode_num);
  * `file_name`: the file of which to find the next inode for
  * `inode`: the inode to search in 
  * `inode_num`: where to save the next inode number if found 
- * 
- * TODO: only scans direct blks for now
  */
 ssize_t next_inode_in_path(int fd, char *file_name, struct uwufs_inode* inode,
                            uwufs_blk_t *inode_num);
 
 
 /**
- * TODO:
  * Find the inode of the corresponding file. If root directory inode is
  * 		valid, it will use it. Otherwise, it will read the super blk for
  * 		the root directory.
@@ -113,5 +110,11 @@ ssize_t next_inode_in_path(int fd, char *file_name, struct uwufs_inode* inode,
  */
 ssize_t namei(int fd, const char *path, const struct uwufs_inode *root_dir_inode, 
               uwufs_blk_t *inode_num);
+
+/**
+ * Includes the C++ implementation of the low level operations
+ * Kong
+ */
+#include "cpp/c_api.h"
 
 #endif
