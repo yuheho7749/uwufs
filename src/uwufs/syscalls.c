@@ -628,3 +628,31 @@ int uwufs_utimens(const char *path,
 
 	return 0;
 }
+
+int uwufs_chmod(const char * path, mode_t mode, struct fuse_file_info *fi) {
+	return 0;
+}
+
+int uwufs_chown(const char * path, uid_t uid, gid_t gid, struct fuse_file_info *fi) {
+	ssize_t status;
+	uwufs_blk_t inode_num;
+	status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
+
+	struct uwufs_inode inode;
+	status = read_inode(device_fd, &inode, inode_num);
+	RETURN_IF_ERROR(status);
+
+	struct fuse_context *fuse_ctx = fuse_get_context();
+
+	inode.file_uid = uid;
+	inode.file_gid = gid;
+
+	status = write_inode(device_fd, &inode,
+				   sizeof(inode), inode_num);
+	if (status < 0)
+		return -EIO;
+
+	return 0;
+}
