@@ -3,6 +3,7 @@
 
 #include "../low_level_operations.h"
 #include <cstdio>
+#include <cstring>
 
 
 #ifndef assert_low_level_operation
@@ -34,14 +35,17 @@ DataBlockIterator INode::static_dblk_itr(const uwufs_inode* inode, int device_fd
 }
 
 uwufs_blk_t INode::recursive_append_dblk(int device_fd, uint8_t level, uwufs_blk_t cur_no, uwufs_blk_t index, uwufs_blk_t block_no) {
+    INode::IndirectBlock indirect_block;
     if (index == 0) {   // need to allocate a new indirect block
         assert_low_level_operation(malloc_blk(device_fd, &cur_no));
+        memset(&indirect_block, 0, UWUFS_BLOCK_SIZE);
 #ifdef DEBUG
         printf("new indirect block: %lu\n", cur_no);
 #endif
     }
-    INode::IndirectBlock indirect_block;
-    assert_low_level_operation(read_blk(device_fd, &indirect_block, cur_no));
+    else {
+        assert_low_level_operation(read_blk(device_fd, &indirect_block, cur_no));
+    }
     if (level == 0) {   // cur_no is the single indirect block
         indirect_block.block_nos[index] = block_no;
         assert_low_level_operation(write_blk(device_fd, &indirect_block, cur_no));
