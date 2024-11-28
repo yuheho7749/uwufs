@@ -25,7 +25,7 @@ void* uwufs_init(struct fuse_conn_info *conn,
 	// For testing fs journaling/recovery:
 	// 		disables page caching in the kernel at the
 	// 		cost of some performance
-	cfg->direct_io = 1;
+	// cfg->direct_io = 1; // Why does this cause read to always read 4k bytes?
 	cfg->use_ino = 1;
 	return NULL;
 }

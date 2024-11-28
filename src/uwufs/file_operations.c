@@ -556,8 +556,7 @@ ssize_t read_file(int fd,
 	dblk_itr_t dblk_itr = create_dblk_itr(inode, fd, cur_blk_num);
 
 	struct uwufs_regular_file_data_blk data_blk;
-	while (cur_blk_num < UWUFS_DIRECT_BLOCKS &&
-			cur_bytes_read < size) {
+	while (cur_bytes_read < size) {
 		
 		cur_blk_num = dblk_itr_next(dblk_itr);
 		if (cur_blk_num == 0) 
