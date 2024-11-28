@@ -560,8 +560,10 @@ ssize_t read_file(int fd,
 			cur_bytes_read < size) {
 		
 		cur_blk_num = dblk_itr_next(dblk_itr);
-		if (cur_blk_num == 0) 
+		if (cur_blk_num == 0) {
+			destroy_dblk_itr(dblk_itr);
 			return cur_bytes_read;
+		}
 
 		status = read_blk(fd, &data_blk, cur_blk_num);
 		RETURN_IF_ERROR(status);
@@ -583,10 +585,9 @@ ssize_t read_file(int fd,
 		else { // last block and partial read
 			memcpy(buf + cur_bytes_read, &data_blk, bytes_remaining);
 			cur_bytes_read += bytes_remaining;
-			return cur_bytes_read;
 		}
-
 	}
+	destroy_dblk_itr(dblk_itr);
 	return cur_bytes_read;
 }
 
