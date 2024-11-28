@@ -31,6 +31,7 @@ static const struct fuse_operations uwufs_oper = {
 	.open		= uwufs_open,
 	.read		= uwufs_read,
 	.write		= uwufs_write,
+	.release	= uwufs_release,
 	.readdir	= uwufs_readdir,
 	.init       = uwufs_init,
 	.create 	= uwufs_create,

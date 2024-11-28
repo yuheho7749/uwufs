@@ -405,6 +405,18 @@ int uwufs_write(const char *path,
 	return -ENOENT;
 }
 
+int uwufs_release(const char *path, struct fuse_file_info *fi)
+{
+	(void) fi;
+	uwufs_blk_t inode_num;
+	ssize_t status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
+
+	return 0;
+	//return -ENOENT;
+}
+
 static int __uwufs_helper_readdir_blk(const struct uwufs_directory_data_blk blk,
 									void *buf,
 									fuse_fill_dir_t filler)
@@ -629,7 +641,8 @@ int uwufs_utimens(const char *path,
 	return 0;
 }
 
-int uwufs_chmod(const char * path, mode_t mode, struct fuse_file_info *fi) {
+int uwufs_chmod(const char * path, mode_t mode, struct fuse_file_info *fi)
+{
 	(void) fi;
 	ssize_t status;
 	uwufs_blk_t inode_num;
