@@ -630,6 +630,25 @@ int uwufs_utimens(const char *path,
 }
 
 int uwufs_chmod(const char * path, mode_t mode, struct fuse_file_info *fi) {
+	(void) fi;
+	ssize_t status;
+	uwufs_blk_t inode_num;
+	struct uwufs_inode inode;
+
+	status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
+
+	status = read_inode(device_fd, &inode, inode_num);
+	if (status < 0)
+		return status;
+
+	inode.file_mode = (inode.file_mode & F_TYPE_BITS) | (mode & F_PERM_BITS);
+
+	status = write_inode(device_fd, &inode, sizeof(inode), inode_num);
+	if (status < 0)
+		return status;
+
 	return 0;
 }
 
