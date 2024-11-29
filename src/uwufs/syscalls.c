@@ -82,13 +82,7 @@ int uwufs_mknod(const char *path, mode_t mode, dev_t device)
 	return -ENOENT;
 }
 
-// 1) namei() with the path up to the directory to be created
-// return if namei errors or the lead-up path isn't found
-// 2) find_free_inode() to get the inode to use 
-// 3) update the parent dir data blk with a new entry
-// 3) malloc & write the new dir data block
-// 	- an entry for '.' and '..'
-// 4) write the new dir inode
+
 int uwufs_mkdir(const char *path,
 				mode_t mode)
 {
@@ -108,15 +102,12 @@ int uwufs_mkdir(const char *path,
 		return -ENOSPC;
 	}
 
-	// printf("original path %s", path);
 	// split path into parent + child parts
 	char parent_path[strlen(path)+1];
 	char child_dir[UWUFS_FILE_NAME_SIZE];
 	status = split_path_parent_child(path, parent_path, child_dir);
 	if (status < 0)
 		return status;
-	// printf("parent_path %s", parent_path);
-	// printf("child_dir %s", child_dir);
 
 	// read root inode for namei
 	struct uwufs_inode root_inode;
@@ -147,7 +138,6 @@ int uwufs_mkdir(const char *path,
 		free_blk(device_fd, new_blk_num);
 		return status;
 	}
-	// RETURN_IF_ERROR(status);
 
 	// new child dir: populate . and .. entry
 	struct uwufs_directory_data_blk new_dir_blk;
@@ -157,17 +147,15 @@ int uwufs_mkdir(const char *path,
 		free_blk(device_fd, new_blk_num);
 		return status;
 	}
-	// RETURN_IF_ERROR(status);
+
 	status = put_directory_file_entry(&new_dir_blk, "..", parent_dir_inode_num);
 	if (status < 0) {
 		free_blk(device_fd, new_blk_num);
 		return status;
 	}
-	// RETURN_IF_ERROR(status);
 
 	// Write entries to actual data block
 	status = write_blk(device_fd, &new_dir_blk, new_blk_num);
-	// RETURN_IF_ERROR(status);
 	if (status < 0) {
 		free_blk(device_fd, new_blk_num);
 		return status;
@@ -192,7 +180,6 @@ int uwufs_mkdir(const char *path,
 	// write new dir inode
 	status = write_inode(device_fd, &new_inode, sizeof(new_inode),
 						 child_dir_inode_num);
-	// RETURN_IF_ERROR(status);
 	if (status < 0) {
 		free_blk(device_fd, new_blk_num);
 		return status;
@@ -372,7 +359,6 @@ int uwufs_write(const char *path,
 				struct fuse_file_info *fi)
 {
 	(void) fi;
-	printf("in uwufs_write\n");
 	
 	uwufs_blk_t inode_num;
 	struct uwufs_inode inode;
@@ -390,7 +376,7 @@ int uwufs_write(const char *path,
 			status = write_file(device_fd, buf, size, offset, 
 				 			    &inode, inode_num);
 			if (status < 0)
-				return -EIO;
+				return status;
 
 			return status;
 		// TODO: other file types (Ex: symlinks don't have data blks)

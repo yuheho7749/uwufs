@@ -29,6 +29,7 @@ ssize_t read_blk(int fd, void* buf, uwufs_blk_t blk_num)
 debug_msg_ret:
 #ifdef DEBUG
 	perror("read_blk error");
+	printf("==>tried to read block %ld\n", blk_num);
 #endif
 	return status;
 }
@@ -144,6 +145,14 @@ ssize_t malloc_blk(int fd, uwufs_blk_t *blk_num)
 
 	super_blk.freelist_head = free_blk.next_free_blk;
 	super_blk.free_blks_left -= 1;
+	
+	if (free_blk.next_free_blk > (super_blk.freelist_start + super_blk.freelist_total_size)) {
+#ifdef DEBUG
+		printf("The next freelist_head is garbage data/out of range\n");
+#endif
+		return -EIO;
+	}
+	
 	status = write_blk(fd, &super_blk, 0);
 	if (status < 0)
 		goto debug_msg_ret;

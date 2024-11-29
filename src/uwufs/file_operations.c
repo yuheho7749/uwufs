@@ -565,7 +565,10 @@ ssize_t read_file(int fd,
 		}
 
 		status = read_blk(fd, &data_blk, cur_blk_num);
-		RETURN_IF_ERROR(status);
+		if (status < 0) {
+			destroy_dblk_itr(dblk_itr);
+			return status;
+		}
 
 		size_t bytes_remaining = size - cur_bytes_read;
 
@@ -609,21 +612,29 @@ ssize_t write_file(int fd,
 	uwufs_blk_t cur_blk_num = offset_blk;
 	size_t cur_bytes_written = 0;
 
+	bool has_malloc = false;
 	struct uwufs_regular_file_data_blk data_blk;
+	uwufs_blk_t new_blk_num;
 
 	while(cur_bytes_written < size){
-		uwufs_blk_t new_blk_num = get_dblk(inode, fd, cur_blk_num);
-
+		new_blk_num = get_dblk(inode, fd, cur_blk_num);
+	
 		if(new_blk_num == 0){
 			status = malloc_blk(fd, &new_blk_num);
-			RETURN_IF_ERROR(status);
+			if (status < 0 || new_blk_num <= 0) {
+				return status;
+			}
+			has_malloc = true;
 			status = append_dblk(inode, fd, cur_blk_num, new_blk_num);
-			if (status == 0)
+			if (status == 0) {
+				free_blk(fd, new_blk_num);
 				return -EIO; //maybe there's a better error code to return here
-
+			}
+			printf("new_blk_num was 0, alloc'd: %ld\n", new_blk_num);
 			memset(&data_blk, 0, UWUFS_BLOCK_SIZE);
 		}
 		else {
+			printf("new_blk_num: %ld\n", new_blk_num);
 			status = read_blk(fd, &data_blk, new_blk_num);
 			RETURN_IF_ERROR(status);
 		}
@@ -651,7 +662,10 @@ ssize_t write_file(int fd,
 		}
 
 		status = write_blk(fd, &data_blk, new_blk_num);
-	 	RETURN_IF_ERROR(status);
+	 	if (status < 0) {
+			if (has_malloc) free_blk(fd, new_blk_num);
+			return status;
+		}
 
 		cur_blk_num += 1;
 	}
@@ -668,7 +682,10 @@ ssize_t write_file(int fd,
 		inode->file_size = newly_written_size;
 
 	status = write_inode(fd, inode, sizeof(struct uwufs_inode), inode_num);
-	RETURN_IF_ERROR(status);
+	if (status < 0) {
+		if (has_malloc) free_blk(fd, new_blk_num);
+		return status;
+	}
 
 #ifdef DEBUG
 	printf("Have %ld bytes written\n", cur_bytes_written);
