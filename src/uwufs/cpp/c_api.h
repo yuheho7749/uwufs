@@ -67,6 +67,8 @@ uwufs_blk_t append_dblk(struct uwufs_inode* inode, int device_fd, uwufs_blk_t in
  */
 uwufs_blk_t remove_dblk(struct uwufs_inode* inode, int device_fd, uwufs_blk_t index);
 
+void remove_dblks(struct uwufs_inode* inode, int device_fd, uwufs_blk_t start_index, uwufs_blk_t end_index);
+
 #ifdef __cplusplus
 }
 #endif

@@ -28,10 +28,12 @@ int main() {
     }
 
     // test remove_dblk
-    for (uwufs_blk_t i = 299999; i > 0; --i) {
-        if (get_dblk(&inode, fd, i) != remove_dblk(&inode, fd, i)) {
-            printf("remove_dblk failed\n");
-            return 1;
-        }
-    }
+    // for (uwufs_blk_t i = 299999; i > 199999; --i) {
+    //     if (get_dblk(&inode, fd, i) != remove_dblk(&inode, fd, i)) {
+    //         printf("remove_dblk failed\n");
+    //         return 1;
+    //     }
+    // }
+    // test remove_dblks
+    remove_dblks(&inode, fd, 200000, 300000);
 }

@@ -27,3 +27,7 @@ uwufs_blk_t append_dblk(uwufs_inode* inode, int device_fd, uwufs_blk_t index, uw
 uwufs_blk_t remove_dblk(uwufs_inode* inode, int device_fd, uwufs_blk_t index) {
     return INode::remove_dblk(inode, device_fd, index);
 }
+
+void remove_dblks(uwufs_inode* inode, int device_fd, uwufs_blk_t start_index, uwufs_blk_t end_index) {
+    INode::remove_dblks(inode, device_fd, start_index, end_index);
+}
