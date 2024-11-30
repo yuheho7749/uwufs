@@ -88,7 +88,8 @@ ssize_t __remove_entry_from_dir_data_blk(int fd,
 ssize_t link_file(int fd,
 				  const char *path,
 				  const char *new_path,
-				  bool force_link);
+				  bool force_dir_link,
+				  int nlinks_change);
 
 /**
  * Removes a file entry in its parent directory

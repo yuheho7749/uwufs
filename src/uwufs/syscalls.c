@@ -315,6 +315,8 @@ int uwufs_rename(const char *old_path, const char *new_path, unsigned int flags)
 	char new_parent_path[strlen(new_path)+1];
 	char new_child_dir[UWUFS_FILE_NAME_SIZE];
 
+	bool is_dir;
+
 	ssize_t status = namei(device_fd, old_path, NULL, &inode_num);
 	if (status < 0)
 		return -ENOENT;
@@ -342,48 +344,50 @@ int uwufs_rename(const char *old_path, const char *new_path, unsigned int flags)
 		}
 		status = write_inode(device_fd, &inode_new, sizeof(inode_new), inode_num_other);
 		if (status < 0) return status;
-move_file_entry:
-		status = read_inode(device_fd, &inode_old, inode_num);
-		if (status < 0) return status;
-		status = link_file(device_fd, old_path, new_path, true);
-		if (status < 0) return status;
-		status = unlink_file(device_fd, old_path, &inode_old, inode_num, 0);
-		if (status < 0) return status;
-		return 0;
-	} else if (flags == RENAME_NOREPLACE) {
+
+		// regular rename file
+		goto move_file_entry;
+	} else if (flags == RENAME_NOREPLACE) { // NOTE: "mv" only uses this?
 		status = namei(device_fd, new_path, NULL, &inode_num_other);
 		if (status == -ENOENT) {
-			// TODO: rename here
-			printf("uwufs_rename: NOREPLACE not implemented yet\n");
-			return -EIO;
+			// regular rename file
+			goto move_file_entry;
 		} else if (status < 0) {
 			return status;
 		}
 		// new name already exists
 		return -EEXIST;
-	} else if (flags == RENAME_EXCHANGE) {
-		// TODO: rename here
+	} else if (flags == RENAME_EXCHANGE) { // NOTE: Unsupported for now
 		printf("uwufs_rename: EXCHANGE not implemented yet\n");
-		return -EIO;
+		return -ENOSYS;
 	} else {
 		printf("uwufs_rename: invalid flags");
 		return -EINVAL;
 	}
 	return 0;
+
+move_file_entry:
+	status = read_inode(device_fd, &inode_old, inode_num);
+	if (status < 0) return status;
+	is_dir = inode_old.file_mode & F_TYPE_BITS & F_TYPE_DIRECTORY;
+	status = link_file(device_fd, old_path, new_path, true, is_dir ? 1 : 0);
+	if (status < 0) return status;
+	status = unlink_file(device_fd, old_path, &inode_old, inode_num, is_dir ? -1 : 0);
+	if (status < 0) return status;
+	return 0;
 #else
 	printf("uwufs_rename: Not Linux");
-	return -ENOENT;
+	return -ENOSYS;
 #endif
 }
 
 int uwufs_link(const char *old_path, const char *new_path)
 {
-	ssize_t status = link_file(device_fd, old_path, new_path, false);
+	ssize_t status = link_file(device_fd, old_path, new_path, false, 1);
 	if (status < 0) return status;
 	return 0;
 }
 
-// TODO:
 int uwufs_open(const char *path,
 			   struct fuse_file_info *fi)
 {
@@ -393,7 +397,6 @@ int uwufs_open(const char *path,
 		return -ENOENT;
 	
 	return 0;
-	//return -ENOENT;
 }
 
 // TODO:
@@ -487,7 +490,6 @@ int uwufs_release(const char *path, struct fuse_file_info *fi)
 		return -ENOENT;
 
 	return 0;
-	//return -ENOENT;
 }
 
 static int __uwufs_helper_readdir_blk(const struct uwufs_directory_data_blk blk,

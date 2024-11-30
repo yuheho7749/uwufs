@@ -285,9 +285,10 @@ found_entry_ret:
 }
 
 ssize_t link_file(int fd,
-					  const char *old_path,
-					  const char *new_path,
-				  bool force_link)
+				  const char *old_path,
+				  const char *new_path,
+				  bool force_dir_link,
+				  int nlinks_change)
 {
 	ssize_t status;
 	struct uwufs_inode old_inode;
@@ -296,6 +297,7 @@ ssize_t link_file(int fd,
 	uwufs_blk_t parent_dir_inode_num;
 	char parent_path[strlen(new_path)+1];
 	char child_path[UWUFS_FILE_NAME_SIZE];
+	bool is_dir;
 
 	// TODO: edit m,a,c time
 
@@ -316,8 +318,9 @@ ssize_t link_file(int fd,
 	status = read_inode(fd, &old_inode, old_inode_num);
 	if (status < 0)
 		return status;
-
-	if (!force_link && old_inode.file_mode & F_TYPE_BITS & F_TYPE_DIRECTORY) {
+	
+	is_dir = old_inode.file_mode & F_TYPE_BITS & F_TYPE_DIRECTORY;
+	if (!force_dir_link && is_dir) {
 		return -EISDIR;
 	}
 
@@ -331,9 +334,11 @@ ssize_t link_file(int fd,
 		if (status < 0)
 			return -ENOENT;
 		status = add_directory_file_entry(fd, parent_dir_inode_num,
-						   child_path, old_inode_num, 0);
+						   child_path, old_inode_num, is_dir ? nlinks_change : 0); // I hate I need to do this
 		if (status < 0) return status;
-		old_inode.file_links_count += 1;
+		if (!force_dir_link) { // I hate that I need to do this
+			old_inode.file_links_count += nlinks_change;
+		}
 		status = write_inode(fd, &old_inode, sizeof(old_inode), old_inode_num);
 		if (status < 0) return status;
 		return 0;
