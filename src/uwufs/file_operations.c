@@ -692,3 +692,39 @@ ssize_t write_file(int fd,
 #endif
 	return cur_bytes_written; 
 }
+
+ssize_t truncate_file(int fd, uwufs_blk_t inode_num)
+{
+	ssize_t status;
+	struct uwufs_inode inode;
+	status = read_inode(fd, &inode, inode_num);
+	RETURN_IF_ERROR(status);
+
+	uint64_t cur_file_size = inode.file_size;
+	uwufs_blk_t cur_file_blks = cur_file_size / UWUFS_BLOCK_SIZE;
+	if (cur_file_size % UWUFS_BLOCK_SIZE != 0)
+		cur_file_blks++;
+	
+	uwufs_blk_t index; 
+	uwufs_blk_t dblk_to_free; 
+	for (index = cur_file_blks; index >= 0; index--) {
+		dblk_to_free = get_dblk(&inode, fd, index);
+		if (dblk_to_free == 0) break;
+		printf("==>Freeing blk %lu\n", dblk_to_free);
+		status = free_blk(fd, dblk_to_free);
+		RETURN_IF_ERROR(status);
+	}
+
+	remove_dblks(&inode, fd, 0, cur_file_blks);
+
+	size_t inode_dblk_addresses = sizeof(inode.direct_blks) + 
+								 sizeof(inode.single_indirect_blks) +
+								 sizeof(inode.double_indirect_blks) + 
+								 sizeof(inode.triple_indirect_blks);
+	memset(&inode, 0, inode_dblk_addresses);
+	inode.file_size = 0;
+	status = write_inode(fd, &inode, sizeof(inode), inode_num);
+	RETURN_IF_ERROR(status);
+
+	return 0;
+}

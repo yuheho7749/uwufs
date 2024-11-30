@@ -170,12 +170,15 @@ debug_msg_ret:
 
 ssize_t free_blk(int fd, const uwufs_blk_t blk_num)
 {
+	printf("in free_blk\n");
 	struct uwufs_super_blk super_blk;
 	struct uwufs_free_data_blk new_freelist_head;
 	ssize_t status = read_blk(fd, &super_blk, 0);
 	if (status < 0)
 		goto debug_msg_ret;
-
+	//
+	//memset(&new_freelist_head, 0, UWUFS_BLOCK_SIZE);
+	//
 	new_freelist_head.next_free_blk = super_blk.freelist_head;
 	super_blk.freelist_head = blk_num;
 	super_blk.free_blks_left += 1;
