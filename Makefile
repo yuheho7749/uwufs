@@ -1,6 +1,6 @@
 VERSION = 0
 SUBVERSION = 2
-PATCH = 27
+PATCH = 30
 EXTRAVERSION = -a
 
 DEBUG = 0
@@ -63,4 +63,4 @@ c_api_test: $(COMMON_FILES) $(SRC_DIR)/test/c_api_test.cpp $(CPP_SRC_DIR)/c_api.
 	$(CXX) $(CFLAGS) $^ -lfuse3 -o $@
 
 clean:
-	rm -f $(BUILD_DIR)/*.o phase1 mkfs.uwu test test-rw-complex mount.uwu
+	rm -f $(BUILD_DIR)/*.o phase1 mkfs.uwu test test-rw-complex mount.uwu $(CPP_SRC_DIR)/*.o
