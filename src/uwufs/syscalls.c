@@ -16,6 +16,10 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifdef __linux__
+#include <linux/fs.h>
+#endif
+
 extern int device_fd;
 
 void* uwufs_init(struct fuse_conn_info *conn,
@@ -293,6 +297,89 @@ int uwufs_rmdir(const char *path)
 						 sizeof(struct uwufs_inode), child_dir_inode_num);
 	if (status < 0) return -EIO;
 
+	return 0;
+}
+
+int uwufs_rename(const char *old_path, const char *new_path, unsigned int flags)
+{
+#ifdef __linux__
+	uwufs_blk_t inode_num;
+	uwufs_blk_t inode_num_other;
+	struct uwufs_inode inode_old;
+	struct uwufs_inode inode_new;
+	int nlinks_change = 0;
+	int status2;
+	char old_parent_path[strlen(old_path)+1];
+	char old_child_dir[UWUFS_FILE_NAME_SIZE];
+
+	char new_parent_path[strlen(new_path)+1];
+	char new_child_dir[UWUFS_FILE_NAME_SIZE];
+
+	ssize_t status = namei(device_fd, old_path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
+	// TODO: edit m,a,c time
+
+	if (flags == RENAME_WHITEOUT) {
+		status = namei(device_fd, new_path, NULL, &inode_num_other);
+		if (status == -ENOENT) {
+			goto move_file_entry;
+		} else if (status < 0) {
+			return status;
+		}
+		// remove the other file b/c it exists
+		status = read_inode(device_fd, &inode_new, inode_num_other);
+		if (status < 0)
+			return status;
+		nlinks_change = (inode_new.file_mode & F_TYPE_BITS & F_TYPE_DIRECTORY) ? 1 : 0;
+		status = unlink_file(device_fd, new_path, &inode_new, inode_num_other,
+					   nlinks_change);
+		if (status < 0) return status;
+		if (inode_new.file_links_count == 0) {
+			// free the data blk and inode
+			status = remove_file(device_fd, &inode_new, inode_num_other);
+			if (status < 0) return status;
+		}
+		status = write_inode(device_fd, &inode_new, sizeof(inode_new), inode_num_other);
+		if (status < 0) return status;
+move_file_entry:
+		status = read_inode(device_fd, &inode_old, inode_num);
+		if (status < 0) return status;
+		status = link_file(device_fd, old_path, new_path, true);
+		if (status < 0) return status;
+		status = unlink_file(device_fd, old_path, &inode_old, inode_num, 0);
+		if (status < 0) return status;
+		return 0;
+	} else if (flags == RENAME_NOREPLACE) {
+		status = namei(device_fd, new_path, NULL, &inode_num_other);
+		if (status == -ENOENT) {
+			// TODO: rename here
+			printf("uwufs_rename: NOREPLACE not implemented yet\n");
+			return -EIO;
+		} else if (status < 0) {
+			return status;
+		}
+		// new name already exists
+		return -EEXIST;
+	} else if (flags == RENAME_EXCHANGE) {
+		// TODO: rename here
+		printf("uwufs_rename: EXCHANGE not implemented yet\n");
+		return -EIO;
+	} else {
+		printf("uwufs_rename: invalid flags");
+		return -EINVAL;
+	}
+	return 0;
+#else
+	printf("uwufs_rename: Not Linux");
+	return -ENOENT;
+#endif
+}
+
+int uwufs_link(const char *old_path, const char *new_path)
+{
+	ssize_t status = link_file(device_fd, old_path, new_path, false);
+	if (status < 0) return status;
 	return 0;
 }
 

@@ -284,6 +284,65 @@ found_entry_ret:
 	return last_file_entry_index;
 }
 
+ssize_t link_file(int fd,
+					  const char *old_path,
+					  const char *new_path,
+				  bool force_link)
+{
+	ssize_t status;
+	struct uwufs_inode old_inode;
+	uwufs_blk_t old_inode_num;
+	uwufs_blk_t child_file_inode_num;
+	uwufs_blk_t parent_dir_inode_num;
+	char parent_path[strlen(new_path)+1];
+	char child_path[UWUFS_FILE_NAME_SIZE];
+
+	// TODO: edit m,a,c time
+
+	// FIX: Here to make sure the append_dblk in add_directory_entry
+	// always have enough data blocks (remove it after the bug is fixed)
+	struct uwufs_super_blk super_blk;
+	status = read_blk(fd, &super_blk, 0);
+	if (status < 0)
+		return status;
+	if (super_blk.free_blks_left <= 5) {
+		return -ENOSPC;
+	}
+	
+	status = namei(fd, old_path, NULL, &old_inode_num);
+	if (status < 0)
+		return status;
+
+	status = read_inode(fd, &old_inode, old_inode_num);
+	if (status < 0)
+		return status;
+
+	if (!force_link && old_inode.file_mode & F_TYPE_BITS & F_TYPE_DIRECTORY) {
+		return -EISDIR;
+	}
+
+	status = split_path_parent_child(new_path, parent_path, child_path);
+	if (status < 0)
+		return status;
+
+	status = namei(fd, new_path, NULL, &child_file_inode_num);
+	if (status == -ENOENT) {
+		status = namei(fd, parent_path, NULL, &parent_dir_inode_num);
+		if (status < 0)
+			return -ENOENT;
+		status = add_directory_file_entry(fd, parent_dir_inode_num,
+						   child_path, old_inode_num, 0);
+		if (status < 0) return status;
+		old_inode.file_links_count += 1;
+		status = write_inode(fd, &old_inode, sizeof(old_inode), old_inode_num);
+		if (status < 0) return status;
+		return 0;
+	} else if (status < 0) {
+		return status;
+	}
+	return -EEXIST;
+}
+
 /**
  * Removes directory entry
  */

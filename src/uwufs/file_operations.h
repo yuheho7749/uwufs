@@ -84,6 +84,12 @@ ssize_t __remove_entry_from_dir_data_blk(int fd,
 						 int last_file_entry_index,
 						 const char name[UWUFS_FILE_NAME_SIZE],
 						 uwufs_blk_t file_inode_num);
+
+ssize_t link_file(int fd,
+				  const char *path,
+				  const char *new_path,
+				  bool force_link);
+
 /**
  * Removes a file entry in its parent directory
  * 
