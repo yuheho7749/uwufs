@@ -17,12 +17,16 @@
 ssize_t read_blk(int fd, void* buf, uwufs_blk_t blk_num)
 {
 	ssize_t status = lseek(fd, blk_num * UWUFS_BLOCK_SIZE, SEEK_SET);
-	if (status < 0)
+	if (status < 0) {
+		printf("read_blk lseek error %lu\n", blk_num);
 		goto debug_msg_ret;
+	}
 
 	status = read(fd, buf, UWUFS_BLOCK_SIZE);
-	if (status < 0)
+	if (status < 0) {
+		printf("read_blk read error %lu\n", blk_num);
 		goto debug_msg_ret;
+	}
 
 	return status;
 
@@ -66,6 +70,8 @@ ssize_t read_inode(int fd, void* buf, uwufs_blk_t inode_num)
 
 	uwufs_blk_t inode_num_in_blk;
 	struct uwufs_inode_blk inode_blk;
+	printf("write_inode inode_num %lu\n", inode_num);
+	printf("write_inode inode_blk_num %lu\n", inode_blk_num);
 	ssize_t status = read_blk(fd, &inode_blk, inode_blk_num);
 	if (status < 0) {
 #ifdef DEBUG

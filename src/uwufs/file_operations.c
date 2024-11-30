@@ -600,6 +600,7 @@ ssize_t write_file(int fd,
 				  uwufs_blk_t inode_num)
 {
 
+	printf("write_file begin inode_num %lu\n", inode_num);
 	//offset initialization
 	ssize_t status;
 	size_t offset_bytes = offset % UWUFS_BLOCK_SIZE;
@@ -612,18 +613,26 @@ ssize_t write_file(int fd,
 	struct uwufs_regular_file_data_blk data_blk;
 
 	while(cur_bytes_written < size){
+		printf("write_file: before get_dblk %lu\n", cur_blk_num);
 		uwufs_blk_t new_blk_num = get_dblk(inode, fd, cur_blk_num);
+		printf("write_file: after get_dblk %lu\n", new_blk_num);
 
 		if(new_blk_num == 0){
+
+			printf("write_file: malloc %lu\n", new_blk_num);
 			status = malloc_blk(fd, &new_blk_num);
 			RETURN_IF_ERROR(status);
+			printf("write_file: append %lu\n", new_blk_num);
 			status = append_dblk(inode, fd, cur_blk_num, new_blk_num);
-			if (status == 0)
+			printf("write_file: after append %lu\n", new_blk_num);
+			if (status == 0) {
 				return -EIO; //maybe there's a better error code to return here
+			}
 
 			memset(&data_blk, 0, UWUFS_BLOCK_SIZE);
 		}
 		else {
+			printf("write_file: new_blk_num %lu\n", new_blk_num);
 			status = read_blk(fd, &data_blk, new_blk_num);
 			RETURN_IF_ERROR(status);
 		}
@@ -642,7 +651,7 @@ ssize_t write_file(int fd,
 			if (bytes_remaining >= UWUFS_BLOCK_SIZE) {
 				//need another block
 				memcpy(&data_blk, buf + cur_bytes_written, sizeof(data_blk));
-			cur_bytes_written += UWUFS_BLOCK_SIZE;
+				cur_bytes_written += UWUFS_BLOCK_SIZE;
 			} else {
 				//last block we need
 				memcpy(&data_blk, buf + cur_bytes_written, bytes_remaining);
@@ -667,6 +676,7 @@ ssize_t write_file(int fd,
 	if (newly_written_size > inode->file_size)
 		inode->file_size = newly_written_size;
 
+	printf("write_file end inode_num %lu\n", inode_num);
 	status = write_inode(fd, inode, sizeof(struct uwufs_inode), inode_num);
 	RETURN_IF_ERROR(status);
 
