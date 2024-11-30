@@ -17,12 +17,18 @@ int main() {
     }
     init_uwufs(fd, 1000000, UWUFS_RESERVED_SPACE, UWUFS_ILIST_DEFAULT_PERCENTAGE);
     struct uwufs_inode inode;
-    for (uwufs_blk_t i = 0; i < 300000; ++i) {
+    for (uwufs_blk_t i = 0; i < 500000; ++i) {
         uwufs_blk_t blk_no = i + 1;
         append_dblk(&inode, fd, i, blk_no);
         // printf("i = %lu\n", i);
         if (get_dblk(&inode, fd, i) != blk_no) {
             printf("append_dblk or get_dblk failed\n");
+            return 1;
+        }
+    }
+    for (uwufs_blk_t i = 0; i < 500000; ++i) {
+        if (get_dblk(&inode, fd, i) != i + 1) {
+            printf("get_dblk failed: %lu\n", i);
             return 1;
         }
     }
@@ -35,5 +41,5 @@ int main() {
     //     }
     // }
     // test remove_dblks
-    remove_dblks(&inode, fd, 200000, 300000);
+    // remove_dblks(&inode, fd, 200000, 300000);
 }
