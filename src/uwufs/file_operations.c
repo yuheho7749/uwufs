@@ -609,61 +609,51 @@ ssize_t write_file(int fd,
 	//curr values
 	uwufs_blk_t cur_blk_num = offset_blk;
 	size_t cur_bytes_written = 0;
+	uwufs_blk_t cur_blk_idx = offset_blk;
 
 	struct uwufs_regular_file_data_blk data_blk;
 
+	size_t current_blocks = (inode->file_size + UWUFS_BLOCK_SIZE - 1) / UWUFS_BLOCK_SIZE;
+	size_t required_blocks = (offset + size + UWUFS_BLOCK_SIZE - 1) / UWUFS_BLOCK_SIZE;
+	size_t blocks_to_append = (required_blocks > current_blocks) ? (required_blocks - current_blocks) : 0;
+
+	for (size_t i = 0; i < blocks_to_append; i++) {
+		uwufs_blk_t new_blk_num;
+		ssize_t status = malloc_blk(fd, &new_blk_num);
+		RETURN_IF_ERROR(status);
+
+		status = append_dblk(inode, fd, current_blocks + i, new_blk_num);
+		RETURN_IF_ERROR(status);
+		memset(&data_blk, 0, UWUFS_BLOCK_SIZE);
+	}
+
+	dblk_itr_t itr = create_dblk_itr(inode, fd, offset_blk);
+
 	while(cur_bytes_written < size){
-		printf("write_file: before get_dblk %lu\n", cur_blk_num);
-		uwufs_blk_t new_blk_num = get_dblk(inode, fd, cur_blk_num);
-		printf("write_file: after get_dblk %lu\n", new_blk_num);
-
-		if(new_blk_num == 0){
-
-			printf("write_file: malloc %lu\n", new_blk_num);
-			status = malloc_blk(fd, &new_blk_num);
-			RETURN_IF_ERROR(status);
-			printf("write_file: append %lu\n", new_blk_num);
-			status = append_dblk(inode, fd, cur_blk_num, new_blk_num);
-			printf("write_file: after append %lu\n", new_blk_num);
-			if (status == 0) {
-				return -EIO; //maybe there's a better error code to return here
-			}
-
-			memset(&data_blk, 0, UWUFS_BLOCK_SIZE);
-		}
-		else {
-			printf("write_file: new_blk_num %lu\n", new_blk_num);
-			status = read_blk(fd, &data_blk, new_blk_num);
-			RETURN_IF_ERROR(status);
-		}
-
 		size_t bytes_remaining = size - cur_bytes_written;
-
 		if (offset_bytes > 0 && cur_bytes_written == 0) {
-			// Now write data starting at offset
 			size_t block_space_available = UWUFS_BLOCK_SIZE - offset_bytes;
     		size_t bytes_to_write = bytes_remaining < block_space_available ? bytes_remaining : block_space_available;
 
 			memcpy((char*)&data_blk + offset_bytes, buf + cur_bytes_written, bytes_to_write);
 			cur_bytes_written += bytes_to_write;
 		} else {
-			//new block: 
 			if (bytes_remaining >= UWUFS_BLOCK_SIZE) {
-				//need another block
 				memcpy(&data_blk, buf + cur_bytes_written, sizeof(data_blk));
 				cur_bytes_written += UWUFS_BLOCK_SIZE;
 			} else {
-				//last block we need
 				memcpy(&data_blk, buf + cur_bytes_written, bytes_remaining);
 				cur_bytes_written += bytes_remaining;
 			}
 		}
 
-		status = write_blk(fd, &data_blk, new_blk_num);
-	 	RETURN_IF_ERROR(status);
+		status = write_blk(fd, &data_blk, cur_blk_num);
+		RETURN_IF_ERROR(status);
+		uwufs_blk_t cur_blk_num = dblk_itr_next(itr);
 
-		cur_blk_num += 1;
+
 	}
+
 
 	time_t unix_time;
 	unix_time = time(NULL);
