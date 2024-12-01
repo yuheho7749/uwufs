@@ -705,12 +705,19 @@ ssize_t truncate_file(int fd, uwufs_blk_t inode_num)
 	if (cur_file_size % UWUFS_BLOCK_SIZE != 0)
 		cur_file_blks++;
 	
+	printf("%ld\n", cur_file_blks);
+
 	uwufs_blk_t index; 
 	uwufs_blk_t dblk_to_free; 
-	for (index = cur_file_blks; index >= 0; index--) {
-		dblk_to_free = get_dblk(&inode, fd, index);
+	// free up all the blocks before calling remove_dblks()
+	for (index = cur_file_blks; index > 0; index--) {
+		dblk_to_free = get_dblk(&inode, fd, index-1);
+		
+		// here for safety reasons
 		if (dblk_to_free == 0) break;
-		printf("==>Freeing blk %lu\n", dblk_to_free);
+#ifdef DEBUG
+		printf("==>Truncating: Freeing blk %lu\n", dblk_to_free);
+#endif
 		status = free_blk(fd, dblk_to_free);
 		RETURN_IF_ERROR(status);
 	}
