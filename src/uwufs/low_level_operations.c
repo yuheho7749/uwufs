@@ -70,8 +70,6 @@ ssize_t read_inode(int fd, void* buf, uwufs_blk_t inode_num)
 
 	uwufs_blk_t inode_num_in_blk;
 	struct uwufs_inode_blk inode_blk;
-	printf("write_inode inode_num %lu\n", inode_num);
-	printf("write_inode inode_blk_num %lu\n", inode_blk_num);
 	ssize_t status = read_blk(fd, &inode_blk, inode_blk_num);
 	if (status < 0) {
 #ifdef DEBUG
