@@ -2,10 +2,15 @@
 
 cd /mnt/uwufs
 
-# for i in {1..45}
+# for i in {1..10000}
 # do
 #   mkdir "dir$i"
 # done
+
+for i in {1..10000}
+do
+  rmdir "dir$i"
+done
 
 # for dir in */
 # do
@@ -16,7 +21,7 @@ cd /mnt/uwufs
 #   fi
 # done
 
-for i in {1..500}
-do
-  touch "file$i.txt"
-done
+# for i in {1..500}
+# do
+#   touch "file$i.txt"
+# done
