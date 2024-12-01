@@ -25,7 +25,7 @@ void* uwufs_init(struct fuse_conn_info *conn,
 	// For testing fs journaling/recovery:
 	// 		disables page caching in the kernel at the
 	// 		cost of some performance
-	cfg->direct_io = 1;
+	// cfg->direct_io = 1; // Why does this cause read to always read 4k bytes?
 	cfg->use_ino = 1;
 	return NULL;
 }
@@ -313,7 +313,13 @@ int uwufs_rmdir(const char *path)
 int uwufs_open(const char *path,
 			   struct fuse_file_info *fi)
 {
-	return -ENOENT;
+	uwufs_blk_t inode_num;
+	ssize_t status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
+	
+	return 0;
+	//return -ENOENT;
 }
 
 // TODO:
@@ -323,6 +329,38 @@ int uwufs_read(const char *path,
 			   off_t offset,
 			   struct fuse_file_info *fi)
 {
+	(void) fi;
+	printf("in uwufs_read\n");
+	
+	uwufs_blk_t inode_num;
+	struct uwufs_inode inode;
+	ssize_t status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
+
+	status = read_inode(device_fd, &inode, inode_num);
+	RETURN_IF_ERROR(status);
+
+	// TODO: Check file permissions using fuse_context
+	switch (inode.file_mode & F_TYPE_BITS) {
+		case F_TYPE_REGULAR:
+			status = read_file(device_fd, buf, size, offset, &inode);
+			if (status < 0)
+				return -EIO;
+
+			return status;
+		case F_TYPE_DIRECTORY:
+			return -EISDIR;
+		
+		// TODO: other file types (Ex: symlinks don't have data blks)
+		default:
+#ifdef DEBUG
+			printf("uwufs_unlink: unknown file type %d\n",
+		  inode.file_mode & F_TYPE_BITS);
+#endif
+			return -EINVAL;
+	}
+
 	return -ENOENT;
 }
 
@@ -333,7 +371,50 @@ int uwufs_write(const char *path,
 				off_t offset,
 				struct fuse_file_info *fi)
 {
+	(void) fi;
+	printf("in uwufs_write\n");
+	
+	uwufs_blk_t inode_num;
+	struct uwufs_inode inode;
+	ssize_t status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
+
+	status = read_inode(device_fd, &inode, inode_num);
+	RETURN_IF_ERROR(status);
+
+	// TODO: Check file permissions using fuse_context
+	switch (inode.file_mode & F_TYPE_BITS) {
+		case F_TYPE_REGULAR:
+		// case F_TYPE_DIRECTORY: // should be handled by readdir
+			status = write_file(device_fd, buf, size, offset, 
+				 			    &inode, inode_num);
+			if (status < 0)
+				return -EIO;
+
+			return status;
+		// TODO: other file types (Ex: symlinks don't have data blks)
+		default:
+#ifdef DEBUG
+			printf("uwufs_unlink: unknown file type %d\n",
+		  inode.file_mode & F_TYPE_BITS);
+#endif
+			return -EINVAL;
+	}
+
 	return -ENOENT;
+}
+
+int uwufs_release(const char *path, struct fuse_file_info *fi)
+{
+	(void) fi;
+	uwufs_blk_t inode_num;
+	ssize_t status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
+
+	return 0;
+	//return -ENOENT;
 }
 
 static int __uwufs_helper_readdir_blk(const struct uwufs_directory_data_blk blk,
@@ -556,6 +637,54 @@ int uwufs_utimens(const char *path,
 	status = write_inode(device_fd, &inode, sizeof(inode), inode_num);
 	if (status < 0)
 		return status;
+
+	return 0;
+}
+
+int uwufs_chmod(const char * path, mode_t mode, struct fuse_file_info *fi)
+{
+	(void) fi;
+	ssize_t status;
+	uwufs_blk_t inode_num;
+	struct uwufs_inode inode;
+
+	status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
+
+	status = read_inode(device_fd, &inode, inode_num);
+	if (status < 0)
+		return status;
+
+	inode.file_mode = (inode.file_mode & F_TYPE_BITS) | (mode & F_PERM_BITS);
+
+	status = write_inode(device_fd, &inode, sizeof(inode), inode_num);
+	if (status < 0)
+		return status;
+
+	return 0;
+}
+
+int uwufs_chown(const char * path, uid_t uid, gid_t gid, struct fuse_file_info *fi) {
+	ssize_t status;
+	uwufs_blk_t inode_num;
+	status = namei(device_fd, path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
+
+	struct uwufs_inode inode;
+	status = read_inode(device_fd, &inode, inode_num);
+	RETURN_IF_ERROR(status);
+
+	struct fuse_context *fuse_ctx = fuse_get_context();
+
+	inode.file_uid = uid;
+	inode.file_gid = gid;
+
+	status = write_inode(device_fd, &inode,
+				   sizeof(inode), inode_num);
+	if (status < 0)
+		return -EIO;
 
 	return 0;
 }

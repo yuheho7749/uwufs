@@ -17,12 +17,16 @@
 ssize_t read_blk(int fd, void* buf, uwufs_blk_t blk_num)
 {
 	ssize_t status = lseek(fd, blk_num * UWUFS_BLOCK_SIZE, SEEK_SET);
-	if (status < 0)
+	if (status < 0) {
+		printf("read_blk lseek error %lu\n", blk_num);
 		goto debug_msg_ret;
+	}
 
 	status = read(fd, buf, UWUFS_BLOCK_SIZE);
-	if (status < 0)
+	if (status < 0) {
+		printf("read_blk read error %lu\n", blk_num);
 		goto debug_msg_ret;
+	}
 
 	return status;
 
@@ -37,7 +41,9 @@ ssize_t write_blk(int fd,
 				  const void* buf,
 				  uwufs_blk_t blk_num)
 {
-	ssize_t status = lseek(fd, blk_num * UWUFS_BLOCK_SIZE, SEEK_SET);
+
+	off_t offset = blk_num * UWUFS_BLOCK_SIZE;
+	ssize_t status = lseek(fd, offset, SEEK_SET);
 	if (status < 0)
 		goto debug_msg_ret;
 

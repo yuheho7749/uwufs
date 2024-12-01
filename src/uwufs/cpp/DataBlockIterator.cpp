@@ -15,6 +15,8 @@ IndirectBlockIterator::IndirectBlockIterator(uwufs_blk_t iblk_no, int device_fd,
 : device_fd(device_fd), inode(inode), current_index(start_index) {
     if (iblk_no != 0) {
         iblk = std::make_unique<INode::IndirectBlock>();
+		// BUG: Offending statement
+		printf("Indirect block iterator iblk_no %lu\n", iblk_no);
         auto ret = read_blk(device_fd, iblk.get(), iblk_no);
 #ifdef DEBUG
         assert_low_level_operations(ret);
@@ -36,6 +38,7 @@ std::unique_ptr<IndirectBlockIterator> SingleIndirectBlockIterator::next_itr() {
 DoubleIndirectBlockIterator::DoubleIndirectBlockIterator(uwufs_blk_t iblk_no, int device_fd, const uwufs_inode* inode, uwufs_blk_t start_i, uwufs_blk_t start_j)
 : IndirectBlockIterator(iblk_no, device_fd, inode, start_i) {
     if (iblk) { // this double indirect block is not empty
+		printf("Double Indirect block iterator %lu\n", iblk->block_nos[start_i]);
         single_itr = std::make_unique<SingleIndirectBlockIterator>(iblk->block_nos[start_i], device_fd, inode, start_j);
     }
 }

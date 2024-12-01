@@ -24,6 +24,8 @@ CPP_DEPENDENCIES = $(CPP_SRC_DIR)/c_api.o $(CPP_SRC_DIR)/DataBlockIterator.o $(C
 
 all: $(BUILD_DIR) mkfs.uwu mount.uwu test
 
+tests: test test-rw-complex
+
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
@@ -37,6 +39,9 @@ mount.uwu: $(COMMON_FILES) $(SRC_DIR)/uwufs/mount_uwufs.c $(SRC_DIR)/uwufs/sysca
 	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
 
 test: $(COMMON_FILES) $(SRC_DIR)/test/test.c $(CPP_DEPENDENCIES)
+	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
+
+test-rw-complex: $(COMMON_FILES) $(SRC_DIR)/test/rw-complex-test.c $(CPP_DEPENDENCIES)
 	$(CC) $(CFLAGS) $^ -lfuse3 -o $@
 
 # C++
@@ -58,4 +63,4 @@ c_api_test: $(COMMON_FILES) $(SRC_DIR)/test/c_api_test.cpp $(CPP_SRC_DIR)/c_api.
 	$(CXX) $(CFLAGS) $^ -lfuse3 -o $@
 
 clean:
-	rm -f $(BUILD_DIR)/*.o phase1 mkfs.uwu test mount.uwu
+	rm -f $(BUILD_DIR)/*.o phase1 mkfs.uwu test test-rw-complex mount.uwu

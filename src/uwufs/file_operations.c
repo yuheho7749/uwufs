@@ -1,7 +1,7 @@
 /**
  * Implements file operations for uwufs.
  *
- * Authors: Joseph, Kay
+ * Authors: Joseph, Kay, Jason
  */
 
 #include "file_operations.h"
@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdbool.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "cpp/c_api.h"
 
@@ -534,4 +536,150 @@ free_direct_blks:
 	inode->file_mode = F_TYPE_FREE;
 	// memset(inode, 0, sizeof(*inode));
 	return 0;
+}
+
+
+
+ssize_t read_file(int fd, 
+				  char *buf,
+				  size_t size,
+				  off_t offset,
+				  struct uwufs_inode *inode)
+{
+	ssize_t status;
+	size_t offset_bytes = offset % UWUFS_BLOCK_SIZE;
+	uwufs_blk_t offset_blk = offset / UWUFS_BLOCK_SIZE; 
+	
+	uwufs_blk_t cur_blk_num = offset_blk;
+	size_t cur_bytes_read = 0;
+
+	dblk_itr_t dblk_itr = create_dblk_itr(inode, fd, cur_blk_num);
+
+	struct uwufs_regular_file_data_blk data_blk;
+	while (cur_bytes_read < size) {
+		
+		cur_blk_num = dblk_itr_next(dblk_itr);
+		if (cur_blk_num == 0) {
+			destroy_dblk_itr(dblk_itr);
+			return cur_bytes_read;
+		}
+
+		status = read_blk(fd, &data_blk, cur_blk_num);
+		RETURN_IF_ERROR(status);
+
+		size_t bytes_remaining = size - cur_bytes_read;
+
+		// first block and offset > 0
+		if (offset_bytes > 0 && cur_bytes_read == 0) {
+			size_t bytes_from_offset = UWUFS_BLOCK_SIZE - offset_bytes;
+			size_t bytes_to_read = bytes_remaining < bytes_from_offset ? bytes_remaining : bytes_from_offset;
+			memcpy(buf, &data_blk + offset_bytes, bytes_to_read);
+			cur_bytes_read += bytes_to_read;
+		}
+		// regular read, full block
+		else if (bytes_remaining > UWUFS_BLOCK_SIZE) {
+			memcpy(buf + cur_bytes_read, &data_blk, sizeof(data_blk));
+			cur_bytes_read += UWUFS_BLOCK_SIZE;
+		}
+		else { // last block and partial read
+			memcpy(buf + cur_bytes_read, &data_blk, bytes_remaining);
+			cur_bytes_read += bytes_remaining;
+		}
+	}
+	destroy_dblk_itr(dblk_itr);
+	return cur_bytes_read;
+}
+
+
+//write file
+ssize_t write_file(int fd, 
+				  const char *buf,
+				  size_t size,
+				  off_t offset,
+				  struct uwufs_inode *inode,
+				  uwufs_blk_t inode_num)
+{
+
+	//offset initialization
+	ssize_t status;
+	size_t offset_bytes = offset % UWUFS_BLOCK_SIZE;
+	uwufs_blk_t offset_blk = offset / UWUFS_BLOCK_SIZE; 
+
+	//curr values
+	uwufs_blk_t cur_blk_num = offset_blk;
+	size_t cur_bytes_written = 0;
+	uwufs_blk_t cur_blk_idx = offset_blk;
+
+	struct uwufs_regular_file_data_blk data_blk;
+
+	size_t current_blocks = (inode->file_size + UWUFS_BLOCK_SIZE - 1) / UWUFS_BLOCK_SIZE;
+	size_t required_blocks = (offset + size + UWUFS_BLOCK_SIZE - 1) / UWUFS_BLOCK_SIZE;
+	size_t blocks_to_append = (required_blocks > current_blocks) ? (required_blocks - current_blocks) : 0;
+
+	for (size_t i = 0; i < blocks_to_append; i++) {
+		uwufs_blk_t new_blk_num;
+		ssize_t status = malloc_blk(fd, &new_blk_num);
+		RETURN_IF_ERROR(status);
+		
+		status = append_dblk(inode, fd, current_blocks + i, new_blk_num);
+		RETURN_IF_ERROR(status);
+		memset(&data_blk, 0, UWUFS_BLOCK_SIZE);
+	}
+
+	dblk_itr_t itr = create_dblk_itr(inode, fd, offset_blk);
+
+	while(cur_bytes_written < size){
+		cur_blk_num = dblk_itr_next(itr);
+
+		// for safety reasons
+		if (cur_blk_num == 0) {
+			continue;
+		}
+
+		size_t bytes_remaining = size - cur_bytes_written;
+		if (offset_bytes > 0 && cur_bytes_written == 0) {
+			size_t block_space_available = UWUFS_BLOCK_SIZE - offset_bytes;
+    		size_t bytes_to_write = bytes_remaining < block_space_available ? bytes_remaining : block_space_available;
+
+			memcpy((char*)&data_blk + offset_bytes, buf + cur_bytes_written, bytes_to_write);
+			cur_bytes_written += bytes_to_write;
+		} else {
+			if (bytes_remaining >= UWUFS_BLOCK_SIZE) {
+				memcpy(&data_blk, buf + cur_bytes_written, sizeof(data_blk));
+				cur_bytes_written += UWUFS_BLOCK_SIZE;
+			} else {
+				memcpy(&data_blk, buf + cur_bytes_written, bytes_remaining);
+				cur_bytes_written += bytes_remaining;
+			}
+		}
+		status = write_blk(fd, &data_blk, cur_blk_num);
+		if (status < 0) {
+			destroy_dblk_itr(itr);
+			return status;
+		}
+	}
+
+
+	time_t unix_time;
+	unix_time = time(NULL);
+	inode->file_atime = (int64_t)unix_time;
+	inode->file_mtime = (int64_t)unix_time;
+	inode->file_ctime = (int64_t)unix_time;
+
+	// if we created new data blocks beyond the existing file size, increase file size
+	size_t newly_written_size = cur_bytes_written + offset;
+	if (newly_written_size > inode->file_size)
+		inode->file_size = newly_written_size;
+
+	status = write_inode(fd, inode, sizeof(struct uwufs_inode), inode_num);
+	if (status < 0) {
+		destroy_dblk_itr(itr);
+		return status;
+	}
+
+#ifdef DEBUG
+	printf("Have %ld bytes written\n", cur_bytes_written);
+#endif
+	destroy_dblk_itr(itr);
+	return cur_bytes_written; 
 }

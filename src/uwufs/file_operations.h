@@ -130,4 +130,19 @@ ssize_t __free_triple_indirect_blk(int fd,
 ssize_t remove_file(int fd,
 					  struct uwufs_inode *inode,
 					  uwufs_blk_t inode_num);
+
+
+ssize_t read_file(int fd, 
+				  char *buf,
+				  size_t size,
+				  off_t offset,
+				  struct uwufs_inode *inode);
+
+ssize_t write_file(int fd, 
+				  const char *buf,
+				  size_t size,
+				  off_t offset,
+				  struct uwufs_inode *inode,
+				  uwufs_blk_t inode_num);
+
 #endif
