@@ -681,16 +681,15 @@ ssize_t write_file(int fd,
 	struct uwufs_regular_file_data_blk data_blk;
 	uwufs_blk_t new_blk_num;
 
-	size_t current_blocks = (inode->file_size + UWUFS_BLOCK_SIZE - 1) / UWUFS_BLOCK_SIZE;
-	size_t required_blocks = (offset + size + UWUFS_BLOCK_SIZE - 1) / UWUFS_BLOCK_SIZE;
-	size_t blocks_to_append = (required_blocks > current_blocks) ? (required_blocks - current_blocks) : 0;
+	size_t remaining_data = size - (UWUFS_BLOCK_SIZE - offset_bytes);
+	size_t blocks_to_append = (remaining_data + UWUFS_BLOCK_SIZE - 1) / UWUFS_BLOCK_SIZE;
 
 	for (size_t i = 0; i < blocks_to_append; i++) {
 		uwufs_blk_t new_blk_num;
 		ssize_t status = malloc_blk(fd, &new_blk_num);
 		RETURN_IF_ERROR(status);
 		
-		status = append_dblk(inode, fd, current_blocks + i, new_blk_num);
+		status = append_dblk(inode, fd, cur_blk_num + i, new_blk_num);
 		RETURN_IF_ERROR(status);
 		memset(&data_blk, 0, UWUFS_BLOCK_SIZE);
 	}
@@ -709,7 +708,11 @@ ssize_t write_file(int fd,
 		if (offset_bytes > 0 && cur_bytes_written == 0) {
 			size_t block_space_available = UWUFS_BLOCK_SIZE - offset_bytes;
     		size_t bytes_to_write = bytes_remaining < block_space_available ? bytes_remaining : block_space_available;
-
+			status = read_blk(fd, &data_blk, cur_blk_num);
+			if (status < 0) {
+				destroy_dblk_itr(itr);
+				return status;
+			}
 			memcpy((char*)&data_blk + offset_bytes, buf + cur_bytes_written, bytes_to_write);
 			cur_bytes_written += bytes_to_write;
 		} else {
