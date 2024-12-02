@@ -16,7 +16,7 @@ IndirectBlockIterator::IndirectBlockIterator(uwufs_blk_t iblk_no, int device_fd,
     if (iblk_no != 0) {
         iblk = std::make_unique<INode::IndirectBlock>();
 		// BUG: Offending statement
-		printf("Indirect block iterator iblk_no %lu\n", iblk_no);
+		// printf("Indirect block iterator iblk_no %lu\n", iblk_no);
         auto ret = read_blk(device_fd, iblk.get(), iblk_no);
 #ifdef DEBUG
         assert_low_level_operations(ret);

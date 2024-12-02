@@ -659,98 +659,133 @@ ssize_t read_file(int fd,
 
 
 //write file
-ssize_t write_file(int fd, 
-				  const char *buf,
-				  size_t size,
-				  off_t offset,
-				  struct uwufs_inode *inode,
-				  uwufs_blk_t inode_num)
-{
+ssize_t write_file(
+    int fd,
+    const char *buf,
+    size_t size,
+    off_t offset,
+    struct uwufs_inode *inode,
+    uwufs_blk_t inode_num
+) {
+    // first, calculate how many blocks we need to malloc and append
+    uint64_t cur_size = inode->file_size;
+    uint64_t cur_blks = (cur_size + UWUFS_BLOCK_SIZE - 1) / UWUFS_BLOCK_SIZE;
+    uint64_t new_size = offset + size;
+    uint64_t new_blks = (new_size + UWUFS_BLOCK_SIZE - 1) / UWUFS_BLOCK_SIZE;
+#ifdef DEBUG
+    printf("cur_size: %lu, cur_blks: %lu, new_size: %lu, new_blks: %lu\n", cur_size, cur_blks, new_size, new_blks);
+#endif
 
-	//offset initialization
-	ssize_t status;
-	size_t offset_bytes = offset % UWUFS_BLOCK_SIZE;
-	uwufs_blk_t offset_blk = offset / UWUFS_BLOCK_SIZE; 
+    struct uwufs_regular_file_data_blk zero_blk;
+    memset(&zero_blk, 0, sizeof(zero_blk));
+    for (uint64_t i = cur_blks; i < new_blks; i++) {
+        uwufs_blk_t new_blk_num;
+        ssize_t status = malloc_blk(fd, &new_blk_num);
+        if (status < 0) {
+#ifdef DEBUG
+            printf("malloc_blk failed: i = %lu\n", i);
+#endif
+            return status;
+        }
+        // zero out the block
+        status = write_blk(fd, &zero_blk, new_blk_num);
+        if (status < 0) {
+#ifdef DEBUG
+            printf("write_blk failed: i = %lu\n", i);
+#endif
+            return status;
+        }
+        status = append_dblk(inode, fd, i, new_blk_num);
+        if (status < 0) {
+#ifdef DEBUG
+            printf("append_dblk failed: i = %lu\n", i);
+#endif
+            return status;
+        }
+    }
 
-	//curr values
-	uwufs_blk_t cur_blk_num = offset_blk;
-	size_t cur_bytes_written = 0;
-	uwufs_blk_t cur_blk_idx = offset_blk;
+    // printf("new_size: %lu\n", new_size);
 
-	bool has_malloc = false;
-	struct uwufs_regular_file_data_blk data_blk;
-	uwufs_blk_t new_blk_num;
+    // now, write the data
+    uwufs_blk_t cur_index = offset / UWUFS_BLOCK_SIZE;
+    dblk_itr_t dblk_itr = create_dblk_itr(inode, fd, cur_index);
+    // write the first block
+    uwufs_blk_t cur_blk_num = dblk_itr_next(dblk_itr);
+    char data_blk[UWUFS_BLOCK_SIZE];
+    // read the block first
+    ssize_t status = read_blk(fd, data_blk, cur_blk_num);
+    if (status < 0) {
+        destroy_dblk_itr(dblk_itr);
+#ifdef DEBUG
+        printf("read_blk failed: cur_blk_num = %lu\n", cur_blk_num);
+#endif
+        return status;
+    }
+    // printf("finished reading first block\n");
+    // calculate the offset in the block
+    size_t offset_bytes = offset % UWUFS_BLOCK_SIZE;
+    // calculate how many bytes we can write in this block
+    size_t bytes_to_write = size < UWUFS_BLOCK_SIZE - offset_bytes ? size : UWUFS_BLOCK_SIZE - offset_bytes;
+    // printf("offset_bytes: %lu, bytes_to_write: %lu\n", offset_bytes, bytes_to_write);
+    // write the data
+    // printf("data_blk: %p\n", data_blk);
+    // printf("dest: %p, src: %p, size: %lu\n", data_blk + offset_bytes, buf, bytes_to_write);
+    memcpy(data_blk + offset_bytes, buf, bytes_to_write);
+    // write the block back
+    // printf("before write the first block\n");
+    status = write_blk(fd, data_blk, cur_blk_num);
 
-	size_t current_blocks = (inode->file_size + UWUFS_BLOCK_SIZE - 1) / UWUFS_BLOCK_SIZE;
-	size_t required_blocks = (offset + size + UWUFS_BLOCK_SIZE - 1) / UWUFS_BLOCK_SIZE;
-	size_t blocks_to_append = (required_blocks > current_blocks) ? (required_blocks - current_blocks) : 0;
+    // printf("write rest of the blocks\n");
+    // write the rest of the blocks
+    size_t bytes_written = bytes_to_write;
+    while (bytes_written < size) {
+        cur_blk_num = dblk_itr_next(dblk_itr);
+#ifdef DEBUG
+        printf("cur_blk_num = %lu\n", cur_blk_num);
+#endif
+        status = read_blk(fd, data_blk, cur_blk_num);
+        if (status < 0) {
+            destroy_dblk_itr(dblk_itr);
+#ifdef DEBUG
+            printf("read_blk failed: cur_blk_num = %lu\n", cur_blk_num);
+#endif
+            return status;
+        }
+        size_t bytes_remaining = size - bytes_written;
+        size_t bytes_to_write = bytes_remaining < UWUFS_BLOCK_SIZE ? bytes_remaining : UWUFS_BLOCK_SIZE;
+        memcpy(data_blk, buf + bytes_written, bytes_to_write);
+        status = write_blk(fd, data_blk, cur_blk_num);
+        if (status < 0) {
+            destroy_dblk_itr(dblk_itr);
+#ifdef DEBUG
+            printf("write_blk failed: cur_blk_num = %lu\n", cur_blk_num);
+#endif
+            return status;
+        }
+        bytes_written += bytes_to_write;
+    }
 
-	for (size_t i = 0; i < blocks_to_append; i++) {
-		uwufs_blk_t new_blk_num;
-		ssize_t status = malloc_blk(fd, &new_blk_num);
-		RETURN_IF_ERROR(status);
-		
-		status = append_dblk(inode, fd, current_blocks + i, new_blk_num);
-		RETURN_IF_ERROR(status);
-		memset(&data_blk, 0, UWUFS_BLOCK_SIZE);
-	}
-
-	dblk_itr_t itr = create_dblk_itr(inode, fd, offset_blk);
-
-	while(cur_bytes_written < size){
-		cur_blk_num = dblk_itr_next(itr);
-
-		// for safety reasons
-		if (cur_blk_num == 0) {
-			continue;
-		}
-
-		size_t bytes_remaining = size - cur_bytes_written;
-		if (offset_bytes > 0 && cur_bytes_written == 0) {
-			size_t block_space_available = UWUFS_BLOCK_SIZE - offset_bytes;
-    		size_t bytes_to_write = bytes_remaining < block_space_available ? bytes_remaining : block_space_available;
-
-			memcpy((char*)&data_blk + offset_bytes, buf + cur_bytes_written, bytes_to_write);
-			cur_bytes_written += bytes_to_write;
-		} else {
-			if (bytes_remaining >= UWUFS_BLOCK_SIZE) {
-				memcpy(&data_blk, buf + cur_bytes_written, sizeof(data_blk));
-				cur_bytes_written += UWUFS_BLOCK_SIZE;
-			} else {
-				memcpy(&data_blk, buf + cur_bytes_written, bytes_remaining);
-				cur_bytes_written += bytes_remaining;
-			}
-		}
-		status = write_blk(fd, &data_blk, cur_blk_num);
-		if (status < 0) {
-			destroy_dblk_itr(itr);
-			return status;
-		}
-	}
-
-
-	time_t unix_time;
+    // printf("update the inode\n");
+    // update the inode
+    if (new_size > cur_size) {
+        inode->file_size = new_size;
+    }
+    time_t unix_time;
 	unix_time = time(NULL);
 	inode->file_atime = (int64_t)unix_time;
 	inode->file_mtime = (int64_t)unix_time;
 	inode->file_ctime = (int64_t)unix_time;
-
-	// if we created new data blocks beyond the existing file size, increase file size
-	size_t newly_written_size = cur_bytes_written + offset;
-	if (newly_written_size > inode->file_size)
-		inode->file_size = newly_written_size;
-
-	status = write_inode(fd, inode, sizeof(struct uwufs_inode), inode_num);
-	if (status < 0) {
-		destroy_dblk_itr(itr);
-		return status;
-	}
-
+    status = write_inode(fd, inode, sizeof(*inode), inode_num);
+    if (status < 0) {
+        destroy_dblk_itr(dblk_itr);
 #ifdef DEBUG
-	printf("Have %ld bytes written\n", cur_bytes_written);
+        printf("write_inode failed\n");
 #endif
-	destroy_dblk_itr(itr);
-	return cur_bytes_written; 
+        return status;
+    }
+
+    destroy_dblk_itr(dblk_itr);
+    return size;
 }
 
 ssize_t truncate_file(int fd, uwufs_blk_t inode_num)
