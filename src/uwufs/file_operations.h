@@ -152,4 +152,6 @@ ssize_t write_file(int fd,
 				  struct uwufs_inode *inode,
 				  uwufs_blk_t inode_num);
 
+ssize_t truncate_file(int fd, uwufs_blk_t inode_num);
+
 #endif

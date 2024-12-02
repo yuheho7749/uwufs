@@ -165,3 +165,51 @@ uwufs_blk_t INode::remove_dblk(uwufs_inode *inode, int device_fd, uwufs_blk_t in
     }
     return block_no;
 }
+
+void INode::remove_dblks(uwufs_inode *inode, int device_fd, uwufs_blk_t start_index, uwufs_blk_t end_index) {
+    // It will write all modification directly to the disk EXCEPT the inode itself.
+    // Remember to write the inode to disk after calling this function.
+    // Returns the block number of the removed data block.
+    // It will not free the data block.
+    // free the data block numbers: [start_index, end_index)
+    // for (uwufs_blk_t i{start_index}; i < end_index; ++i) {
+    //     remove_dblk(inode, device_fd, i);
+    // }
+    if (start_index >= end_index) {
+        return;
+    }
+    recursive_remove_dblks(device_fd, inode->single_indirect_blks, LEVEL_0_BLOCKS, LEVEL_1_BLOCKS, start_index, end_index);
+    recursive_remove_dblks(device_fd, inode->double_indirect_blks, LEVEL_1_BLOCKS, LEVEL_2_BLOCKS, start_index, end_index);
+    recursive_remove_dblks(device_fd, inode->triple_indirect_blks, LEVEL_2_BLOCKS, LEVEL_3_BLOCKS, start_index, end_index);
+}
+
+void INode::recursive_remove_dblks(int device_fd, uwufs_blk_t cur_no, uwufs_blk_t cur_left, uwufs_blk_t cur_right, uwufs_blk_t start_index, uwufs_blk_t end_index) {
+    // free the data block numbers: [start_index, end_index)
+    // the current indirect block contains the data blocks: [cur_left, cur_right)
+    if (start_index >= cur_right || end_index <= cur_left) {    // no overlap
+        return;
+    }
+    auto stride{(cur_right - cur_left) / (UWUFS_BLOCK_SIZE / sizeof(uwufs_blk_t))};
+    if (stride > 1) {   // not single indirect block
+        INode::IndirectBlock indirect_block;
+        if (read_blk(device_fd, &indirect_block, cur_no) < 0) {
+#ifdef DEBUG
+            printf("failed to read indirect block: %lu\n", cur_no);
+#endif
+            return;
+        }
+        for (uwufs_blk_t i{0}; i < UWUFS_BLOCK_SIZE / sizeof(uwufs_blk_t); ++i) {
+            recursive_remove_dblks(device_fd, indirect_block.block_nos[i], cur_left + i * stride, cur_left + (i + 1) * stride, start_index, end_index);
+        }
+    }
+    if (start_index <= cur_left) {  // need to free the current indirect block
+#ifdef DEBUG
+        printf("free indirect block: %lu\n", cur_no);
+#endif
+        if (free_blk(device_fd, cur_no) < 0) {
+#ifdef DEBUG
+            printf("failed to free indirect block: %lu\n", cur_no);
+#endif
+        }
+    }
+}

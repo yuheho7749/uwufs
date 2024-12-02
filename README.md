@@ -16,3 +16,4 @@ A universal and (hopefully) working userspace filesystem for 64-bit linux-like s
 ### Optional flags
 - `-f`: make fuse run in the forground.
 - `-o allow_other`: allow other users access to the fuse fs (we handle permissions ourselves)
+- `-s`: run with a single thread

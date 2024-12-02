@@ -395,6 +395,11 @@ int uwufs_open(const char *path,
 	ssize_t status = namei(device_fd, path, NULL, &inode_num);
 	if (status < 0)
 		return -ENOENT;
+
+	if (fi->flags & O_TRUNC) {
+		status = truncate_file(device_fd, inode_num);
+		RETURN_IF_ERROR(status);
+	}
 	
 	return 0;
 }
@@ -750,8 +755,6 @@ int uwufs_chown(const char * path, uid_t uid, gid_t gid, struct fuse_file_info *
 	struct uwufs_inode inode;
 	status = read_inode(device_fd, &inode, inode_num);
 	RETURN_IF_ERROR(status);
-
-	struct fuse_context *fuse_ctx = fuse_get_context();
 
 	inode.file_uid = uid;
 	inode.file_gid = gid;

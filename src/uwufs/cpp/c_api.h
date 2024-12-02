@@ -67,6 +67,18 @@ uwufs_blk_t append_dblk(struct uwufs_inode* inode, int device_fd, uwufs_blk_t in
  */
 uwufs_blk_t remove_dblk(struct uwufs_inode* inode, int device_fd, uwufs_blk_t index);
 
+/**
+ * It will write all modification directly to the disk EXCEPT the inode itself (but will modify the struct inode in memory).
+ * It will not free the data block.
+ * free the data block numbers: [start_index, end_index)
+ * equivalent to:
+   * ```
+   * for (uwufs_blk_t i{start_index}; i < end_index; ++i) {
+   *     remove_dblk(inode, device_fd, i);
+   * }
+ */
+void remove_dblks(struct uwufs_inode* inode, int device_fd, uwufs_blk_t start_index, uwufs_blk_t end_index);
+
 #ifdef __cplusplus
 }
 #endif
