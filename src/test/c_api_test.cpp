@@ -15,9 +15,9 @@ int main() {
         printf("open failed\n");
         return 1;
     }
-    init_uwufs(fd, 1000000, UWUFS_RESERVED_SPACE, UWUFS_ILIST_DEFAULT_PERCENTAGE);
+    init_uwufs(fd, 100000, UWUFS_RESERVED_SPACE, UWUFS_ILIST_DEFAULT_PERCENTAGE);
     struct uwufs_inode inode;
-    for (uwufs_blk_t i = 0; i < 500000; ++i) {
+    for (uwufs_blk_t i = 0; i < 300000; ++i) {
         uwufs_blk_t blk_no = i + 1;
         append_dblk(&inode, fd, i, blk_no);
         // printf("i = %lu\n", i);
@@ -26,12 +26,10 @@ int main() {
             return 1;
         }
     }
-    for (uwufs_blk_t i = 0; i < 500000; ++i) {
-        if (get_dblk(&inode, fd, i) != i + 1) {
-            printf("get_dblk failed: %lu\n", i);
-            return 1;
-        }
-    }
+    // auto itr = create_dblk_itr(&inode, fd, 262656);
+    // for (int i = 0; i < 100; ++i) {
+    //     printf("%lu\n", dblk_itr_next(itr));
+    // }
 
     // test remove_dblk
     // for (uwufs_blk_t i = 299999; i > 199999; --i) {

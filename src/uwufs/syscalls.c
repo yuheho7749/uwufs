@@ -412,7 +412,7 @@ int uwufs_read(const char *path,
 			   struct fuse_file_info *fi)
 {
 	(void) fi;
-	printf("in uwufs_read\n");
+	// printf("in uwufs_read\n");
 	
 	uwufs_blk_t inode_num;
 	struct uwufs_inode inode;
