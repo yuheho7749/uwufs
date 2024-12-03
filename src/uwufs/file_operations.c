@@ -255,7 +255,7 @@ ssize_t __remove_entry_from_dir_data_blk(int fd,
 	for (i = 0; i < n; i++) {
 		file_entry = dir_data_blk->file_entries[i];
 		if (file_entry.inode_num == file_inode_num &&
-			(name == NULL || strcmp(file_entry.file_name, name) == 0)) {
+			(strcmp(file_entry.file_name, name) == 0)) {
 			// clear file entry
 			goto found_entry_ret;
 		}
@@ -264,7 +264,7 @@ ssize_t __remove_entry_from_dir_data_blk(int fd,
 
 found_entry_ret:
 	if (last_dir_data_blk == NULL && i == last_file_entry_index) {
-		memset(&dir_data_blk->file_entries[i], 0, sizeof(file_entry));
+		memset(&(dir_data_blk->file_entries[i]), 0, sizeof(file_entry));
 	} else if (last_dir_data_blk == NULL) {
 		memcpy(&dir_data_blk->file_entries[i],
 			 &(dir_data_blk->file_entries[last_file_entry_index]),
@@ -386,7 +386,9 @@ ssize_t unlink_file(int fd,
 	status = namei(fd, parent_path, NULL, &parent_inode_num);
 	if (status < 0)
 		return -ENOENT;
-
+#ifdef DEBUG
+	assert(parent_inode_num != 0);
+#endif
 	status = read_inode(fd, &parent_inode, parent_inode_num);
 	if (status < 0)
 		return status;
@@ -395,6 +397,9 @@ ssize_t unlink_file(int fd,
 	num_data_blks = (parent_inode.file_size + UWUFS_BLOCK_SIZE - 1)
 		/ UWUFS_BLOCK_SIZE;
 	last_dblk_num = get_dblk(&parent_inode, fd, num_data_blks - 1);
+#ifdef DEBUG
+	assert(last_dblk_num != 0);
+#endif
 	status = read_blk(fd, &last_dir_data_blk, last_dblk_num);
 	if (status < 0) return status;
 	for (last_file_entry_index = num_file_entries - 1;
@@ -450,19 +455,37 @@ found_last_entry:
 				status = -EIO;
 				goto fail_ret;
 			}
-			free_blk(fd, last_dblk_index); // remove_dblk does not free the actual dblk...
+#ifdef DEBUG
+			assert(last_dblk_index != 0);
+#endif
+			status = write_blk(fd, &dir_data_blk, dir_data_blk_num);
+			if (status < 0)
+				goto fail_ret;
+			status = free_blk(fd, last_dblk_index); // remove_dblk does not free the actual dblk...
+			if (status < 0) goto fail_ret;
 			parent_inode.file_size -= UWUFS_BLOCK_SIZE;
 			parent_inode.file_ctime = (uint64_t)unix_time;
+			goto success_ret;
 		} else {
+#ifdef DEBUG
+			assert(last_dblk_num != 0);
+#endif
 			status = write_blk(fd, &last_dir_data_blk, last_dblk_num);
 			if (status < 0) goto fail_ret;
+			status = write_blk(fd, &dir_data_blk, dir_data_blk_num);
+			if (status < 0) goto fail_ret;
+			goto success_ret;
 		}
 
-		status = write_blk(fd, &dir_data_blk, dir_data_blk_num);
-		if (status < 0)
-			goto fail_ret;
-
-		goto success_ret;
+		// BUG: NOOOO, I double freed a data block
+		// if (last_dblk_num != dir_data_blk_num) {
+		// 	status = write_blk(fd, &dir_data_blk, dir_data_blk_num);
+		// 	if (status < 0)
+		// 		goto fail_ret;
+		// }
+		//
+		// goto success_ret;
+		goto fail_ret; // NOTE: should never happen
 	}
 fail_ret:
 	destroy_dblk_itr(dblk_itr);
@@ -713,6 +736,12 @@ ssize_t write_file(
     uwufs_blk_t cur_blk_num = dblk_itr_next(dblk_itr);
     char data_blk[UWUFS_BLOCK_SIZE];
     // read the block first
+#ifdef DEBUG
+	if (cur_blk_num == 0) {
+		printf("write_file: reading super_blk when not supposed to\n");
+		exit(1);
+	}
+#endif
     ssize_t status = read_blk(fd, data_blk, cur_blk_num);
     if (status < 0) {
         destroy_dblk_itr(dblk_itr);
@@ -742,6 +771,7 @@ ssize_t write_file(
         cur_blk_num = dblk_itr_next(dblk_itr);
 #ifdef DEBUG
         printf("cur_blk_num = %lu\n", cur_blk_num);
+		assert(cur_blk_num != 0);
 #endif
         status = read_blk(fd, data_blk, cur_blk_num);
         if (status < 0) {

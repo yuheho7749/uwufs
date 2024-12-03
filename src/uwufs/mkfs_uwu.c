@@ -326,6 +326,7 @@ int main(int argc, char *argv[])
 		blk_dev_size, blk_dev_size/UWUFS_BLOCK_SIZE);
 #endif
 
+	printf("Formating device %s...\n", argv[1]);
 	// NOTE: Read user definable params later.
 	// 	Specifing blk_dev_size to format can help with testing too
 #ifdef DEBUG

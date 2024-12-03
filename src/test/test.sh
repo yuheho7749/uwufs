@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-cd /mnt/uwufs
+cd /mnt
 
-# for i in {1..10000}
-# do
-#   mkdir "dir$i"
-# done
+for i in {1..10000}
+do
+  mkdir "dir$i"
+done
 
 for i in {1..10000}
 do

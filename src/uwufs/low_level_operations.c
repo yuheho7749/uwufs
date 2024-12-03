@@ -12,6 +12,10 @@
 #include <string.h>
 #include <errno.h>
 
+#ifdef DEBUG
+#include <assert.h>
+#endif
+
 #include "cpp/c_api.h"
 
 ssize_t read_blk(int fd, void* buf, uwufs_blk_t blk_num)
@@ -147,6 +151,11 @@ ssize_t malloc_blk(int fd, uwufs_blk_t *blk_num)
 	if (status < 0)
 		goto debug_msg_ret;
 
+#ifdef DEBUG
+	// unless the volume is out of space
+	printf("malloc_blk: freelist head %lu\n", freelist_head);
+	assert(free_blk.next_free_blk != 0);
+#endif
 	super_blk.freelist_head = free_blk.next_free_blk;
 	super_blk.free_blks_left -= 1;
 	
@@ -174,16 +183,31 @@ debug_msg_ret:
 
 ssize_t free_blk(int fd, const uwufs_blk_t blk_num)
 {
+#ifdef DEBUG
 	printf("in free_blk\n");
+	if (blk_num == 0) {
+		printf("free_blk 0!!!\n");
+	}
+	assert(blk_num != 0);
+	struct uwufs_free_data_blk free_blk;
+	uwufs_blk_t old_head;
+#endif
 	struct uwufs_super_blk super_blk;
 	struct uwufs_free_data_blk new_freelist_head;
 	ssize_t status = read_blk(fd, &super_blk, 0);
 	if (status < 0)
 		goto debug_msg_ret;
-	//
-	//memset(&new_freelist_head, 0, UWUFS_BLOCK_SIZE);
-	//
+
+	// memset(&new_freelist_head, 0, UWUFS_BLOCK_SIZE);
+
+#ifdef DEBUG
+	assert(super_blk.freelist_head != 0);
+#endif
 	new_freelist_head.next_free_blk = super_blk.freelist_head;
+#ifdef DEBUG
+	old_head = super_blk.freelist_head;
+	assert(new_freelist_head.next_free_blk != 0);
+#endif
 	super_blk.freelist_head = blk_num;
 	super_blk.free_blks_left += 1;
 
@@ -194,6 +218,17 @@ ssize_t free_blk(int fd, const uwufs_blk_t blk_num)
 	status = write_blk(fd, &super_blk, 0);
 	if (status < 0)
 		goto debug_msg_ret;
+
+#ifdef DEBUG
+	// Read superblock and verify it's correctly set
+	status = read_blk(fd, &super_blk, 0);
+	assert(super_blk.freelist_head != 0);
+	status = read_blk(fd, &free_blk, super_blk.freelist_head);
+	assert(free_blk.next_free_blk != 0);
+	assert(free_blk.next_free_blk == old_head);
+	status = read_blk(fd, &free_blk, free_blk.next_free_blk);
+	assert(free_blk.next_free_blk != 0);
+#endif
 
 	return 0;
 
