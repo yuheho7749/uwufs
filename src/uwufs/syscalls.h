@@ -37,6 +37,10 @@ int uwufs_unlink(const char *path);
 
 int uwufs_rmdir(const char *path);
 
+int uwufs_rename(const char *old_path, const char *new_path, unsigned int flags);
+
+int uwufs_link(const char *old_path, const char *new_path);
+
 int uwufs_open(const char *path, struct fuse_file_info *fi);
 
 int uwufs_read(const char *path, char *buf, size_t size,

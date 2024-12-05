@@ -16,6 +16,10 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifdef __linux__
+#include <linux/fs.h>
+#endif
+
 extern int device_fd;
 
 void* uwufs_init(struct fuse_conn_info *conn,
@@ -82,13 +86,7 @@ int uwufs_mknod(const char *path, mode_t mode, dev_t device)
 	return -ENOENT;
 }
 
-// 1) namei() with the path up to the directory to be created
-// return if namei errors or the lead-up path isn't found
-// 2) find_free_inode() to get the inode to use 
-// 3) update the parent dir data blk with a new entry
-// 3) malloc & write the new dir data block
-// 	- an entry for '.' and '..'
-// 4) write the new dir inode
+
 int uwufs_mkdir(const char *path,
 				mode_t mode)
 {
@@ -108,15 +106,12 @@ int uwufs_mkdir(const char *path,
 		return -ENOSPC;
 	}
 
-	// printf("original path %s", path);
 	// split path into parent + child parts
 	char parent_path[strlen(path)+1];
 	char child_dir[UWUFS_FILE_NAME_SIZE];
 	status = split_path_parent_child(path, parent_path, child_dir);
 	if (status < 0)
 		return status;
-	// printf("parent_path %s", parent_path);
-	// printf("child_dir %s", child_dir);
 
 	// read root inode for namei
 	struct uwufs_inode root_inode;
@@ -147,7 +142,6 @@ int uwufs_mkdir(const char *path,
 		free_blk(device_fd, new_blk_num);
 		return status;
 	}
-	// RETURN_IF_ERROR(status);
 
 	// new child dir: populate . and .. entry
 	struct uwufs_directory_data_blk new_dir_blk;
@@ -157,17 +151,15 @@ int uwufs_mkdir(const char *path,
 		free_blk(device_fd, new_blk_num);
 		return status;
 	}
-	// RETURN_IF_ERROR(status);
+
 	status = put_directory_file_entry(&new_dir_blk, "..", parent_dir_inode_num);
 	if (status < 0) {
 		free_blk(device_fd, new_blk_num);
 		return status;
 	}
-	// RETURN_IF_ERROR(status);
 
 	// Write entries to actual data block
 	status = write_blk(device_fd, &new_dir_blk, new_blk_num);
-	// RETURN_IF_ERROR(status);
 	if (status < 0) {
 		free_blk(device_fd, new_blk_num);
 		return status;
@@ -192,7 +184,6 @@ int uwufs_mkdir(const char *path,
 	// write new dir inode
 	status = write_inode(device_fd, &new_inode, sizeof(new_inode),
 						 child_dir_inode_num);
-	// RETURN_IF_ERROR(status);
 	if (status < 0) {
 		free_blk(device_fd, new_blk_num);
 		return status;
@@ -309,7 +300,94 @@ int uwufs_rmdir(const char *path)
 	return 0;
 }
 
-// TODO:
+int uwufs_rename(const char *old_path, const char *new_path, unsigned int flags)
+{
+#ifdef __linux__
+	uwufs_blk_t inode_num;
+	uwufs_blk_t inode_num_other;
+	struct uwufs_inode inode_old;
+	struct uwufs_inode inode_new;
+	int nlinks_change = 0;
+	int status2;
+	char old_parent_path[strlen(old_path)+1];
+	char old_child_dir[UWUFS_FILE_NAME_SIZE];
+
+	char new_parent_path[strlen(new_path)+1];
+	char new_child_dir[UWUFS_FILE_NAME_SIZE];
+
+	bool is_dir;
+
+	ssize_t status = namei(device_fd, old_path, NULL, &inode_num);
+	if (status < 0)
+		return -ENOENT;
+	// TODO: edit m,a,c time
+
+	if (flags == RENAME_WHITEOUT) {
+		status = namei(device_fd, new_path, NULL, &inode_num_other);
+		if (status == -ENOENT) {
+			goto move_file_entry;
+		} else if (status < 0) {
+			return status;
+		}
+		// remove the other file b/c it exists
+		status = read_inode(device_fd, &inode_new, inode_num_other);
+		if (status < 0)
+			return status;
+		nlinks_change = (inode_new.file_mode & F_TYPE_BITS & F_TYPE_DIRECTORY) ? 1 : 0;
+		status = unlink_file(device_fd, new_path, &inode_new, inode_num_other,
+					   nlinks_change);
+		if (status < 0) return status;
+		if (inode_new.file_links_count == 0) {
+			// free the data blk and inode
+			status = remove_file(device_fd, &inode_new, inode_num_other);
+			if (status < 0) return status;
+		}
+		status = write_inode(device_fd, &inode_new, sizeof(inode_new), inode_num_other);
+		if (status < 0) return status;
+
+		// regular rename file
+		goto move_file_entry;
+	} else if (flags == RENAME_NOREPLACE) { // NOTE: "mv" only uses this?
+		status = namei(device_fd, new_path, NULL, &inode_num_other);
+		if (status == -ENOENT) {
+			// regular rename file
+			goto move_file_entry;
+		} else if (status < 0) {
+			return status;
+		}
+		// new name already exists
+		return -EEXIST;
+	} else if (flags == RENAME_EXCHANGE) { // NOTE: Unsupported for now
+		printf("uwufs_rename: EXCHANGE not implemented yet\n");
+		return -ENOSYS;
+	} else {
+		printf("uwufs_rename: invalid flags");
+		return -EINVAL;
+	}
+	return 0;
+
+move_file_entry:
+	status = read_inode(device_fd, &inode_old, inode_num);
+	if (status < 0) return status;
+	is_dir = inode_old.file_mode & F_TYPE_BITS & F_TYPE_DIRECTORY;
+	status = link_file(device_fd, old_path, new_path, true, is_dir ? 1 : 0);
+	if (status < 0) return status;
+	status = unlink_file(device_fd, old_path, &inode_old, inode_num, is_dir ? -1 : 0);
+	if (status < 0) return status;
+	return 0;
+#else
+	printf("uwufs_rename: Not Linux");
+	return -ENOSYS;
+#endif
+}
+
+int uwufs_link(const char *old_path, const char *new_path)
+{
+	ssize_t status = link_file(device_fd, old_path, new_path, false, 1);
+	if (status < 0) return status;
+	return 0;
+}
+
 int uwufs_open(const char *path,
 			   struct fuse_file_info *fi)
 {
@@ -317,9 +395,13 @@ int uwufs_open(const char *path,
 	ssize_t status = namei(device_fd, path, NULL, &inode_num);
 	if (status < 0)
 		return -ENOENT;
+
+	if (fi->flags & O_TRUNC) {
+		status = truncate_file(device_fd, inode_num);
+		RETURN_IF_ERROR(status);
+	}
 	
 	return 0;
-	//return -ENOENT;
 }
 
 // TODO:
@@ -330,7 +412,7 @@ int uwufs_read(const char *path,
 			   struct fuse_file_info *fi)
 {
 	(void) fi;
-	printf("in uwufs_read\n");
+	// printf("in uwufs_read\n");
 	
 	uwufs_blk_t inode_num;
 	struct uwufs_inode inode;
@@ -372,7 +454,6 @@ int uwufs_write(const char *path,
 				struct fuse_file_info *fi)
 {
 	(void) fi;
-	printf("in uwufs_write\n");
 	
 	uwufs_blk_t inode_num;
 	struct uwufs_inode inode;
@@ -390,7 +471,7 @@ int uwufs_write(const char *path,
 			status = write_file(device_fd, buf, size, offset, 
 				 			    &inode, inode_num);
 			if (status < 0)
-				return -EIO;
+				return status;
 
 			return status;
 		// TODO: other file types (Ex: symlinks don't have data blks)
@@ -414,7 +495,6 @@ int uwufs_release(const char *path, struct fuse_file_info *fi)
 		return -ENOENT;
 
 	return 0;
-	//return -ENOENT;
 }
 
 static int __uwufs_helper_readdir_blk(const struct uwufs_directory_data_blk blk,
@@ -675,8 +755,6 @@ int uwufs_chown(const char * path, uid_t uid, gid_t gid, struct fuse_file_info *
 	struct uwufs_inode inode;
 	status = read_inode(device_fd, &inode, inode_num);
 	RETURN_IF_ERROR(status);
-
-	struct fuse_context *fuse_ctx = fuse_get_context();
 
 	inode.file_uid = uid;
 	inode.file_gid = gid;

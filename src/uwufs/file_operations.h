@@ -84,6 +84,13 @@ ssize_t __remove_entry_from_dir_data_blk(int fd,
 						 int last_file_entry_index,
 						 const char name[UWUFS_FILE_NAME_SIZE],
 						 uwufs_blk_t file_inode_num);
+
+ssize_t link_file(int fd,
+				  const char *path,
+				  const char *new_path,
+				  bool force_dir_link,
+				  int nlinks_change);
+
 /**
  * Removes a file entry in its parent directory
  * 
@@ -144,5 +151,7 @@ ssize_t write_file(int fd,
 				  off_t offset,
 				  struct uwufs_inode *inode,
 				  uwufs_blk_t inode_num);
+
+ssize_t truncate_file(int fd, uwufs_blk_t inode_num);
 
 #endif

@@ -1,13 +1,14 @@
 /**
  * 	Only for testing
  *
- * 	Authors: Jason, Kay
+ * 	Authors: Kay
  */
 
 #include "../uwufs/uwufs.h"
 #include "../uwufs/file_operations.h"
 
 #include <stdio.h>
+#include <errno.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -15,6 +16,7 @@
 #include <linux/fs.h>
 
 #include "../uwufs/cpp/c_api.h"
+
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -47,8 +49,9 @@ int main(int argc, char* argv[]) {
     int indirect_addresses = UWUFS_BLOCK_SIZE / sizeof(uwufs_blk_t);
     printf("Attempting to write to all direct blks + %d single indirect blks\n", indirect_addresses);
 
+    int i;
     //write to all direct + single indirects
-    for (int i = UWUFS_DIRECT_BLOCKS; i < UWUFS_DIRECT_BLOCKS + indirect_addresses; i++) {
+    for (i = UWUFS_DIRECT_BLOCKS; i < UWUFS_DIRECT_BLOCKS + indirect_addresses; i++) {
         printf("Writing data block %d\n", i+1);
         offset = i * UWUFS_BLOCK_SIZE;
         status = write_file(fd, test_data, data_size, offset, &test_inode, inode_num);
@@ -58,17 +61,45 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    int dbl_indirect_addresses = (UWUFS_BLOCK_SIZE / sizeof(uwufs_blk_t)) *
+                                 (UWUFS_BLOCK_SIZE / sizeof(uwufs_blk_t)); 
+
+    printf("Attempting to write to all %d double indirect blks\n", dbl_indirect_addresses);
+
+    int first_triple_indirect_addr = UWUFS_DIRECT_BLOCKS + indirect_addresses + dbl_indirect_addresses;
+    // write to some double indirects
+    /*
+    for (i = UWUFS_DIRECT_BLOCKS + indirect_addresses; 
+         i < first_triple_indirect_addr; i++) {
+        if (i % indirect_addresses == 0) {
+            printf("Writing data block [%d/%d]\n", i+1, first_triple_indirect_addr);
+        }
+        
+        offset = i * UWUFS_BLOCK_SIZE;
+        status = write_file(fd, test_data, data_size, offset, &test_inode, inode_num);
+        if(status != data_size){
+            printf("Unable to write full %ld bytes\n", data_size);
+            return -1;
+        }
+    }*/
 
 	struct uwufs_regular_file_data_blk data_blk;
-
-    char data_in_block[UWUFS_BLOCK_SIZE];
-    status = read_file(fd, (char*)data_in_block, data_size, offset, &test_inode);
+    
+    status = read_file(fd, data_blk.data, data_size, 0, &test_inode);
+    if (status <= 0) {
+        printf("Read 0 bytes/unsucesful\n");
+        return -EIO;
+    }
+    printf("Read %ld bytes\n", status);
 
     for (size_t i = 0; i < data_size; ++i) {
-        if(data_in_block[i] != test_data[i]){
-            printf("error 3");
+        if(data_blk.data[i] != test_data[i]){
+            printf("error 3\n");
             ret = -1;
             return ret;
+        }
+        else {
+            printf("matching so far\n");
         }
     }
 
