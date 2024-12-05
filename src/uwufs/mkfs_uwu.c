@@ -35,6 +35,7 @@ static uwufs_blk_t init_freelist(int fd,
 								 uwufs_blk_t freelist_size)
 {
 	uwufs_blk_t freelist_end = freelist_start + freelist_size;
+
 #ifdef DEBUG
 	printf("init_freelist: [start: %ld, end: %ld)\n",
 		freelist_start, freelist_end);
@@ -48,12 +49,10 @@ static uwufs_blk_t init_freelist(int fd,
 	uwufs_blk_t next_blk_num = current_blk_num + 1;
 	struct uwufs_free_data_blk free_data_blk;
 	while (current_blk_num < freelist_end - 1) {
-#ifdef DEBUG
-		if (current_blk_num % (freelist_end/20) == 0) {
+		if ((current_blk_num - freelist_start) % (freelist_size/10) == 0) {
 			printf("\tinit_freelist progress: %ld/%ld\n",
-				current_blk_num, freelist_end);
+				current_blk_num - freelist_start, freelist_size);
 		}
-#endif
 
 		// Connect to next block
 		free_data_blk.next_free_blk = next_blk_num;
@@ -130,12 +129,10 @@ static void init_inodes(int fd,
 	uwufs_blk_t ilist_end = ilist_start + ilist_total_size;
 	ssize_t status;
 	for (i = ilist_start; i < ilist_end; i ++) {
-#ifdef DEBUG
-		if (i % (ilist_end/20) == 0) {
+		if (i % (ilist_end/10) == 0) {
 			printf("\tinit inodes blk progress: %ld/%ld\n",
-				i, ilist_end);
+				i - ilist_start, ilist_end - ilist_start);
 		}
-#endif
 		status = write_blk(fd, zero_blk, i);
 		if (status < 0) {
 			perror("mkfs.uwu: error init inode blks");
@@ -264,27 +261,18 @@ static int init_uwufs(int fd,
 	uwufs_blk_t freelist_start = ilist_start + ilist_size;
 	uwufs_blk_t freelist_size = total_blks - 1 - reserved_space - ilist_size;
 
-#ifdef DEBUG
 	printf("Initializing free list\n");
-#endif
 	uwufs_blk_t first_free_blk = init_freelist(fd, total_blks, freelist_start,
 											freelist_size);
 
-#ifdef DEBUG
-	printf("Initializing superblock\n");
-#endif
+	printf("Initializing super block\n");
 	init_superblock(fd, total_blks, ilist_start, ilist_size, freelist_start,
 				 	freelist_size, first_free_blk);
 
-#ifdef DEBUG
 	printf("Initializing inodes\n");
-#endif
-	// TEST: Init inodes
 	init_inodes(fd, ilist_start, ilist_size);
 
-#ifdef DEBUG
 	printf("Initializing root directory\n");
-#endif
 	init_root_directory(fd);
 
 	return 0;
@@ -321,10 +309,9 @@ int main(int argc, char *argv[])
 		close(fd);
 		return 1;
 	}
-#ifdef DEBUG
-	printf("Block device %s size : %ld (%ld blocks)\n", argv[1],
+
+	printf("Block device %s size : %ld bytes (%ld blocks)\n", argv[1],
 		blk_dev_size, blk_dev_size/UWUFS_BLOCK_SIZE);
-#endif
 
 	printf("Formating device %s...\n", argv[1]);
 	// NOTE: Read user definable params later.

@@ -82,9 +82,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	// NOTE: LATER - Check integrity of block device/partition
-#ifdef DEBUG
 	printf("Skip checking integrity of block device/partition...\n");
-#endif
 
 	printf("Mounting '%s' to '%s'...\n", argv[1], argv[2]);
 

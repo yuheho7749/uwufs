@@ -90,7 +90,9 @@ int uwufs_mknod(const char *path, mode_t mode, dev_t device)
 int uwufs_mkdir(const char *path,
 				mode_t mode)
 {
+#ifdef DEBUG
 	printf("mkdir %s\n", path);
+#endif
 	ssize_t status;
 	time_t unix_time;
 	// get the uid etc of the user

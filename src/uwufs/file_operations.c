@@ -830,7 +830,9 @@ ssize_t truncate_file(int fd, uwufs_blk_t inode_num)
 	if (cur_file_size % UWUFS_BLOCK_SIZE != 0)
 		cur_file_blks++;
 	
+#ifdef DEBUG
 	printf("%ld\n", cur_file_blks);
+#endif
 
 	uwufs_blk_t index; 
 	uwufs_blk_t dblk_to_free; 

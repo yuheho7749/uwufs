@@ -1,5 +1,7 @@
 # Universal Working Userspace File System (UWUFS)
-A universal and (hopefully) working userspace filesystem for 64-bit linux-like systems.
+A universal and working userspace filesystem for 64-bit linux-like systems.
+
+NOTE: This is built and tested on Ubuntu 20.04 using FUSE 3.
 
 # Instructions
 
@@ -16,4 +18,4 @@ A universal and (hopefully) working userspace filesystem for 64-bit linux-like s
 ### Optional flags
 - `-f`: make fuse run in the forground.
 - `-o allow_other`: allow other users access to the fuse fs (we handle permissions ourselves)
-- `-s`: run with a single thread
+- `-s`: run with a single thread (always run with this option to maintain thread safety)

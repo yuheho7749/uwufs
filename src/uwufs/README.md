@@ -47,7 +47,7 @@ Default to 10% of total volume
 ### Directories
 Root directory is inode 2
 
-File entry is 64 bytes total (56 for file name + 8 bytes for inode)
+File entry is 256 bytes total (248 for file name + 8 bytes for inode)
 
 ### Files
 10 direct
